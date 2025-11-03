@@ -61,6 +61,267 @@
     </div>
 
     <script>
+        const ALL_EVENTS = [
+            {
+                id: "mystery_merchant",
+                name: "수상한 상인",
+
+                // 등장하는 아이템들
+                itemIds: [
+                    { itemID: "medium_potion", weight: 70 },
+                    { itemID: "large_potion", weight: 20 },
+                    { itemID: "str_potion", weight: 10 },
+                ]
+            },
+
+            {
+                id: "shop",
+                name: "상점",
+
+                // 등장하는 아이템들
+                itemIds: [ "small_potion", "medium_potion", "large_potion" ]
+            },
+            
+            // 몬스터 예시 구조
+            {
+                id: "example",
+                name: "예시",
+                hp: 100,
+                reward: {
+                    goldRange: {
+                        min: 1,
+                        max: 1000
+                    },
+
+                    itemIds: [
+                        { itemID: "small_potion", weight: 40 },
+                        { itemID: "medium_potion", weight: 25 },
+                        { itemID: "large_potion", weight: 10 },
+                        { itemID: "str_potion", weight: 25 },
+                    ]
+                }
+            },
+
+            // 몬스터들
+            {
+                id: "spider",
+                name: "거미",
+                hp: 10,
+                reward: {
+                    goldRange: {
+                        min: 1,
+                        max: 5
+                    },
+                }
+            },
+
+            {
+                id: "wolf",
+                name: "늑대",
+                hp: 15,
+                reward: {
+                    goldRange: {
+                        min: 5,
+                        max: 10
+                    },
+                }
+            },
+
+            {
+                id: "bear",
+                name: "곰",
+                hp: 50,
+                reward: {
+                    goldRange: {
+                        min: 20,
+                        max: 30
+                    },
+
+                    itemIds: [
+                        { itemID: "medium_potion", weight: 40 },
+                        { itemID: "str_potion", weight: 20 },
+                    ]
+                }
+            },
+
+            {
+                id: "head_wolf",
+                name: "우두머리 늑대",
+                hp: 40,
+                reward: {
+                    goldRange: {
+                        min: 20,
+                        max: 30
+                    },
+
+                    itemIds: [
+                        { itemID: "medium_potion", weight: 40 },
+                        { itemID: "str_potion", weight: 20 },
+                    ]
+                }
+            },
+            
+            {
+                id: "goblin",
+                name: "고블린",
+                hp: 30,
+                reward: {
+                    goldRange: {
+                        min: 10,
+                        max: 20
+                    },
+
+                    itemIds: [
+                        { itemID: "small_potion", weight: 40 },
+                        { itemID: "medium_potion", weight: 10 },
+                        { itemID: "str_potion", weight: 5 },
+                    ]
+                }
+            },
+        ]
+
+        const ALL_STAGES = [
+            {
+                id: "forest_enter",
+                name: "숲 초입부",
+                description: "",
+                // 이벤트 확률
+                // eventID -> ALL_EVENTS 의 이벤트 중 하나
+                // weight -> 이벤트가 나올 확률 ( 가중치 )
+                randomEvent: [
+                    { eventID: "mystery_merchant", weight: 10 },
+                    { eventID: "spider", weight: 55 },
+                    { eventID: "wolf", weight: 35 },
+                ]
+            },
+
+            {
+                id: "forest_center",
+                name: "숲의 중심",
+                description: "왠지 위험한 기분이 든다",
+
+                randomEvent: [
+                    { eventID: "bear", weight: 50 },
+                    { eventID: "head_wolf", weight: 50 },
+                ]
+            },
+
+            {
+                id: "cave_enter",
+                name: "동굴 입구",
+                description: "",
+
+                randomEvent: [
+                    { eventID: "mystery_merchant", weight: 10 },
+                    { eventID: "goblin", weight: 65 },
+                    { eventID: "bear", weigth: 25 },
+                ]
+            }
+        ]
+
+        // 아이템 구조
+        // id, name, description, type, priceRange, effect
+
+        // id : 아이템 id
+
+        // name : 아이템 이름
+
+        // description : 아이템 설명
+
+        // type : 아이템 분류 
+        // ( ex: consumable(소모품), weapon(무기) 등 )
+
+        // priceRange : 가격 범위
+
+        // effect : 아이템 효과 
+        // - stat -> 영향주는 부분
+        // - value -> 영향주는 값
+        // - direction -> 효과 적용 방향
+        //  - "RANDOM"     ->  + 또는 - 중 50% 확률로 결정
+        //  - "POSITIVE"   ->  항상 +
+        //  - "NEGATIVE"   ->  항상 -
+        const ALL_ITEMS = [
+            {
+                id: "small_potion",
+                name: "소형 물약",
+                description: "5 ~ 10 범위내 hp만큼 회복됩니다.",
+                type: "consumable",
+                priceRange: {
+                    minPrice: 5,
+                    maxPrice: 10,
+                },
+                effect: { 
+                    stat: "hp",
+                    value: {
+                        minValue: 5,
+                        maxValue: 10
+                    },
+                    
+                    direction: "POSITIVE"
+                },
+            },
+
+            {
+                id: "medium_potion",
+                name: "중형 물약",
+                description: "15 ~ 25 범위내 hp만큼 회복됩니다.",
+                type: "consumable",
+                priceRange: {
+                    minPrice: 10,
+                    maxPrice: 15,
+                },
+                effect: { 
+                    stat: "hp",
+                    value: {
+                        minValue: 15,
+                        maxValue: 25
+                    },
+                    
+                    direction: "POSITIVE"
+                },
+            },
+
+            {
+                id: "large_potion",
+                name: "대형 물약",
+                description: "40 ~ 50 범위내 hp만큼 회복됩니다.",
+                type: "consumable",
+                priceRange: {
+                    minPrice: 20,
+                    maxPrice: 30,
+                },
+                effect: { 
+                    stat: "hp",
+                    value: {
+                        minValue: 40,
+                        maxValue: 50
+                    },
+
+                    direction: "POSITIVE"
+                },
+            },
+
+            {
+                id: "str_potion",
+                name: "수상한 힘의 물약",
+                description: "1 ~ 5 만큼 힘 수치가 오르거나 내려갑니다.",
+                type: "consumable",
+                priceRange: {
+                    minPrice: 10,
+                    maxPrice: 15,
+                },
+                effect: { 
+                    stat: "str",
+                    value: {
+                        minValue: 1,
+                        maxValue: 5
+                    },
+                    
+                    direction: "RANDOM"
+                },
+            },
+        ]
+
         let count = 0; // 생성 횟수를 저장할 변수
 
         function rollDice() {
