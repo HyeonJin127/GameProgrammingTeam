@@ -1,0 +1,94 @@
+/* =========================
+ File: intro.css (외부 스타일시트)
+ Note: event.html 과 같은 폴더에 저장하세요
+========================= */
+:root {
+  --bg: #000000; /* 배경을 완전 검정으로 변경 */
+  --accent: #ffb86b;
+  --accent2: #ff5a00;
+  --text: #f5f5f5;
+  --panel: #1a1a2a;
+  --track: #0b0b13;
+  --fire-glow: rgba(255,120,0,0.14);
+}
+
+html, body {
+  height: 100%; margin: 0;
+  font-family: 'Noto Sans KR', system-ui, sans-serif;
+  color: var(--text); background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+
+.top-ui { position: fixed; top: 12px; right: 12px; }
+.tiny-btn { background: rgba(26,26,42,.8); border:1px solid #ffffff22; border-radius:10px; padding:8px 10px; color:var(--text); cursor:pointer; font-weight:700 }
+.tiny-btn:hover{ background:#2a2a3a }
+
+.intro { width: 100%; height: 100vh; text-align:center; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center }
+
+#logo { display:block; margin: 0 auto; width: min(95vw, 880px); height:auto; visibility:hidden; opacity:0; transform: scale(.9); filter: drop-shadow(0 12px 24px rgba(0,0,0,.35)); transition: opacity 800ms ease, transform 800ms ease, filter 800ms ease }
+#logo.show { visibility: visible; opacity: 1; transform: scale(1); filter: drop-shadow(0 18px 40px rgba(255,90,0,.28)) }
+
+.status { font-size: 20px; color:#cfcfe6; margin: 40px 0 10px; min-height: 22px; opacity:.95 }
+.status.ready { color: var(--accent); font-weight:900; font-size: clamp(26px, 5vw, 38px); letter-spacing:.3px; animation:pulse 1.2s ease-in-out infinite }
+@keyframes pulse { 0%,100%{opacity:.65} 50%{opacity:1} }
+
+.dice-bar { overflow: visible; position:relative; width:100%; height:56px; margin:0 auto 18px; transition: opacity .45s ease, transform .45s ease, height .45s ease, margin .45s ease }
+.dice-bar.hidden { opacity:0; transform: translateY(-10px); height:0; margin:0; pointer-events:none }
+
+.track.rock { position:relative; inset:auto; height:100%; border-radius:18px; overflow:hidden; border:1px solid #ffffff14; background:
+  radial-gradient(120% 140% at 20% 100%, #13131f 0%, #0b0b13 60%),
+  repeating-linear-gradient(45deg, rgba(255,255,255,.04) 0 8px, transparent 8px 16px);
+  box-shadow: inset 0 0 18px rgba(0,0,0,.6);
+}
+
+.fill { position:absolute; left:6px; right:6px; top:7px; bottom:7px; width:0%; border-radius:12px; overflow:hidden; background: transparent; box-shadow: 0 0 26px rgba(255,90,0,.22) inset, 0 0 14px rgba(255,120,0,.18) }
+
+.lava-flow { position:absolute; inset:0; background:
+  radial-gradient(60px 30px at 10% 120%, rgba(255,255,255,.3) 0%, rgba(255,255,255,0) 60%),
+  linear-gradient(90deg, #ff4800, #ff8a00, #ff4800);
+  background-size: 200% 100%;
+  animation: lavaMove 2.2s linear infinite;
+  filter: saturate(1.15) contrast(1.05);
+}
+@keyframes lavaMove { to { background-position: 200% 0; } }
+
+.lava-noise { position:absolute; inset:-12px -12px -12px -12px; background:
+  radial-gradient(6px 6px at 20% 30%, rgba(255,255,255,.35) 0 30%, rgba(255,255,255,0) 70%),
+  radial-gradient(8px 8px at 60% 50%, rgba(255,255,255,.25) 0 30%, rgba(255,255,255,0) 70%),
+  radial-gradient(6px 6px at 80% 40%, rgba(255,255,255,.28) 0 30%, rgba(255,255,255,0) 70%);
+  mix-blend-mode: screen; opacity:.5;
+  animation: noiseDrift 4s linear infinite;
+}
+@keyframes noiseDrift { to { transform: translateX(-40px); } }
+
+.lava-gloss { position:absolute; left:0; right:0; top:0; height:36%; background: linear-gradient( to bottom, rgba(255,255,255,.45), rgba(255,255,255,0) ); mix-blend-mode: screen; opacity:.28 }
+
+.lava-bubbles { position:absolute; inset:0; overflow:hidden }
+.bubble { position:absolute; bottom:6px; left:50%; transform: translateX(-50%); width:10px; height:10px; border-radius:50%; background: radial-gradient(circle at 40% 40%, #fff, rgba(255,255,255,.4) 40%, rgba(255,255,255,0) 70%); mix-blend-mode: screen; opacity:.9; pointer-events:none }
+
+.token { position:absolute; top:50%; left:0%; transform:translate(-50%,-50%); width:64px; height:64px; display:flex; align-items:center; justify-content:center; z-index:12 }
+.die { width:100%; height:100% }
+.shadow { position:absolute; width:64px; height:10px; border-radius:50%; background: rgba(0,0,0,.45); bottom:-6px; left:50%; transform: translateX(-50%) }
+
+.click-veil { position:fixed; inset:0; display:none }
+.click-veil.on { display:block; cursor:pointer }
+
+.gate { position:fixed; inset:0; pointer-events:none; display:none; z-index:999 }
+.gate .top, .gate .bottom {
+  position: absolute;
+  left: 0; right: 0;
+  height: 50%;
+  /* 더 밝은 어둠톤 그라데이션으로 구분감 강화 */
+  background: linear-gradient(#1b1b1f, #050507);
+  box-shadow: 0 0 70px rgba(0,0,0,0.95) inset;
+}
+.gate .top { top: 0; border-bottom: 2px solid rgba(255,255,255,0.06); }
+.gate .bottom { bottom: 0; border-top: 2px solid rgba(255,255,255,0.06); }
+.gate .top { top:0; border-bottom:2px solid #000 }
+.gate .bottom { bottom:0; border-top:2px solid #000 }
+.gate.open { display:block }
+.gate.open .top { animation: gateUp .7s cubic-bezier(.2,.9,.1,1) forwards }
+.gate.open .bottom { animation: gateDown .7s cubic-bezier(.2,.9,.1,1) forwards }
+@keyframes gateUp { to { transform: translateY(-100%) } }
+@keyframes gateDown { to { transform: translateY(100%) } }
