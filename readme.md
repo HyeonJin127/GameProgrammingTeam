@@ -24,9 +24,9 @@ HTML5 기반의 **랜덤 RPG 게임** 입니다.
 ## 폴더 구조
 
 /event
-├─ event.html # 메인 HTML (인트로 로직 포함)
-├─ intro.css # 스타일 정의 (외부 CSS)
-└─ gamelogo.png # 게임 로고 (PNG, 투명 배경 권장)
+event.html # 메인 HTML (인트로 로직 포함)
+intro.css # 스타일 정의 (외부 CSS)
+gamelogo.png # 게임 로고 (PNG, 투명 배경 권장)
 
 > ⚠️ `event.html`, `intro.css`, `gamelogo.png`는 **같은 폴더**에 있어야 합니다.
 
