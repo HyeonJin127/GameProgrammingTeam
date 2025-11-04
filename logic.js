@@ -99,7 +99,6 @@ const ALL_EVENTS = [
 ];
 
 const ALL_STAGES = [
-    //index (2).html 데이터 반영
     {
         id: "forest_enter",
         name: "숲 초입부",
@@ -109,7 +108,6 @@ const ALL_STAGES = [
             { eventID: "spider", weight: 45 },
             { eventID: "wolf", weight: 45 },
         ],
-        // nextStages는 STAGE_PROGRESSION_MAP에서 관리하므로 무시
     },
     {
         id: "forest_center",
@@ -140,7 +138,6 @@ const ALL_STAGES = [
 ];
 
 const ALL_ITEMS = [
-    //index (2).html 데이터 반영
     {
         id: "small_potion",
         name: "소형 물약",
@@ -186,7 +183,7 @@ const ALL_ITEMS = [
         effect: { 
             stat: "str", // 'str'은 'attack'으로 매핑됨
             direction: "RANDOM",
-            // ★ (수정) valueDrops 가중치 사용
+            //valueDrops 가중치 사용
             valueDrops: [
                 { amount: 1, weigth: 25 },
                 { amount: 2, weight: 40 },
@@ -199,7 +196,7 @@ const ALL_ITEMS = [
 ];
 
 // ==========================================
-// 2. (수정) v3 로직: 상태 변수 및 헬퍼 함수
+// 2.상태 변수 및 헬퍼 함수
 // ==========================================
 
 let player;
@@ -237,7 +234,6 @@ function findDataById(array, id) {
     return array.find(item => item.id === id);
 }
 
-/*weight/weigth 오타 모두 처리 */
 function getWeightedRandom(array) {
     let totalWeight = 0;
     for (const item of array) {
@@ -316,7 +312,7 @@ function startGame() {
         inventory: [] 
     };
     
-    // 스테이지 초기화 (v2 로직)
+    // 스테이지 초기화
     currentAreaID = 'forest_enter';
     currentStageData = findDataById(ALL_STAGES, currentAreaID);
     stageLevel = 1;
@@ -364,7 +360,7 @@ function triggerRandomEvent() {
     if (eventData.baseStats) {
         // 몬스터
         gameState = 'COMBAT';
-        // (신규) 몬스터 생성: baseStats를 현재 스탯으로 복사
+        //몬스터 생성: baseStats를 현재 스탯으로 복사
         currentEvent = {
             ...eventData, // name, reward 등 복사
             currentHp: eventData.baseStats.baseHp,
