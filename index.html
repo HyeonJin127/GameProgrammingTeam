@@ -1,95 +1,210 @@
+<!-- =========================
+ File: event.html (메인 HTML)
+ Note: 같은 폴더에 intro.css 와 gamelogo.png 를 놓아주세요
+========================== -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>주사위 굴리기 시뮬레이터</title>
-    <style>
-        /* CSS 스타일 시작 */
-        body {
-            font-family: 'Arial', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background-color: #f0f0f0;
-            margin: 0;
-        }
-        #roller-container {
-            background-color: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-            text-align: center;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-        #dice-result {
-            font-size: 80px;
-            font-weight: bold;
-            color: #d9534f;
-            margin: 20px 0;
-            min-height: 90px;
-        }
-        button {
-            padding: 12px 25px;
-            font-size: 1.2em;
-            background-color: #5cb85c;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #449d44;
-        }
-        /* CSS 스타일 끝 */
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>던전 오브 다이스</title>
+  <!-- 외부 CSS 분리 -->
+  <link rel="stylesheet" href="intro.css" />
 </head>
 <body>
-    <div id="roller-container">
-        <h1>랜덤한 난수를 생성합니다</h1>
-        
-        <div id="dice-result">?</div>
-        
-        <button onclick="rollDice()">난수 생성</button>
+  <!-- 상단 사운드 토글 버튼 -->
+  <div class="top-ui">
+    <button id="sound" class="tiny-btn">🔊 SOUND</button>
+  </div>
 
-        <p id="roll-count">총 생성 횟수: 0</p>
+  <!-- 인트로 컨테이너 -->
+  <div class="intro" id="intro">
+    <!-- 로딩 완료 후 등장할 게임 로고 (같은 폴더의 gamelogo.png 를 가리킴) -->
+    <img id="logo" src="./gamelogo.png" alt="게임 로고" />
+
+    <!-- 로딩 상태 문구: 로딩 중/완료 문구가 동적으로 갱신됨 -->
+    <div class="status" id="status">자원을 불러오는 중…</div>
+
+    <!-- 🔥 용암 게이지 + 주사위 토큰 로딩바 -->
+    <div class="dice-bar" id="diceBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="로딩 진행률">
+      <div class="track rock">
+        <!-- 진행률 컨테이너: width 로 퍼센트 제어 -->
+        <div class="fill" id="fill">
+          <!-- 용암 흐름/노이즈/버블 레이어 -->
+          <div class="lava-flow"></div>
+          <div class="lava-noise"></div>
+          <div class="lava-bubbles" id="lavaBubbles"></div>
+          <div class="lava-gloss"></div>
+        </div>
+      </div>
+
+      <!-- 진행을 따라 움직이는 주사위 토큰 -->
+      <div class="token" id="token" aria-hidden="true">
+        <svg class="die" viewBox="0 0 200 200" data-face="1">
+          <rect x="10" y="10" width="180" height="180" rx="28" ry="28" fill="#fff" stroke="#111" stroke-width="6"></rect>
+          <circle class="pip f1 f3 f5 f6" cx="50" cy="50" r="12"/>
+          <circle class="pip f2 f3 f4 f5 f6" cx="150" cy="150" r="12"/>
+          <circle class="pip f4 f5 f6" cx="150" cy="50" r="12"/>
+          <circle class="pip f4 f5 f6" cx="50" cy="150" r="12"/>
+          <circle class="pip f5" cx="100" cy="100" r="12"/>
+          <circle class="pip f6" cx="50" cy="100" r="12"/>
+          <circle class="pip f6" cx="150" cy="100" r="12"/>
+        </svg>
+        <div class="shadow" id="shadow"></div>
+      </div>
     </div>
+  </div>
 
-    <script>
-        let count = 0; // 생성 횟수를 저장할 변수
+  <!-- 클릭(터치) 전환용 투명 베일 & 게이트 애니메이션 -->
+  <div class="click-veil" id="veil" aria-hidden="true"></div>
+  <div class="gate" id="gate"><div class="top"></div><div class="bottom"></div></div>
 
-        function rollDice() {
-            // 1. 무작위 숫자 생성: 1에서 100 사이의 정수 생성
-            // Math.random()은 0 (포함)에서 1 (제외) 사이의 부동 소수점 숫자를 반환합니다.
-            // Math.floor(Math.random() * 100)는 0부터 99까지의 정수를 만들고,
-            // + 1을 더해 1부터 100까지의 정수로 만듭니다.
-            const randomNumber = Math.floor(Math.random() * 100) + 1;
+  <script>
+    /* ========================
+       인트로 로직 (로딩 → 준비완료 → 클릭 진입)
+       - 용암 게이지 진행 + 주사위 애니메이션
+       - 100% 시 효과음 + 로고 페이드인/확대
+       - 화면 어디든 클릭/터치/Enter/Space 로 진입
+    =========================*/
 
-            // 2. DOM 업데이트: 결과 값을 화면에 표시
-            const resultElement = document.getElementById('dice-result');
-            resultElement.textContent = randomNumber;
+    // DOM 참조
+    const fill = document.getElementById('fill');
+    const soundBtn = document.getElementById('sound');
+    const statusEl = document.getElementById('status');
+    const token = document.getElementById('token');
+    const die = token.querySelector('.die');
+    const shadow = document.getElementById('shadow');
+    const logo = document.getElementById('logo');
+    const diceBar = document.getElementById('diceBar');
+    const veil = document.getElementById('veil');
+    const gate = document.getElementById('gate');
+    const intro = document.getElementById('intro');
+    const bubbles = document.getElementById('lavaBubbles');
 
-            // 3. 횟수 카운트 및 업데이트
-            count++;
-            document.getElementById('roll-count').textContent = `총 굴린 횟수: ${count}`;
+    // 주사위 눈 표시 헬퍼
+    function setFace(n){
+      die.querySelectorAll('.pip').forEach(el=>{
+        el.style.display = el.classList.contains('f'+n) ? 'block' : 'none';
+      });
+    }
 
-            // (선택 사항) 결과에 따른 시각적 피드백
-            resultElement.style.transform = 'rotate(0deg)';
-            resultElement.style.transition = 'none';
-            
-            // 짧은 시간 후 애니메이션 적용
-            setTimeout(() => {
-                resultElement.style.transition = 'transform 0.2s ease-out';
-                // 무작위로 약간 회전시켜 생동감을 더합니다.
-                const randomRotation = Math.floor(Math.random() * 20) - 10; 
-                resultElement.style.transform = `rotate(${randomRotation}deg) scale(1.1)`;
-            }, 10);
-        }
-    </script>
-    </body>
+    // 토큰(주사위) 위치/흔들림 업데이트 - 바의 내부에서만 이동
+    function updateTokenPosition(percentage){
+      const bw  = diceBar.clientWidth;           // 바 너비(px)
+      const tw  = token.offsetWidth || 44;       // 주사위 너비(px)
+      const minCenter = tw / 2;                  // 좌측 여유폭
+      const maxCenter = bw - tw / 2;             // 우측 여유폭
+      const centerX = minCenter + (maxCenter - minCenter) * (percentage / 100);
+
+      token.style.left = centerX + 'px';
+      token.style.transform = `translate(-50%, -50%) rotate(${percentage*3}deg)`;
+
+      // 가벼운 위아래 바운스
+      const bob = Math.sin(percentage/100 * Math.PI * 2) * 6;
+      token.style.transform += ` translateY(${-Math.abs(bob)}px)`;
+
+      // 그림자 크기/투명도 보정 (주사위 크기에 비례)
+      const baseShadowW = Math.max(8, Math.round(tw));
+      shadow.style.width = (baseShadowW - Math.abs(bob)*0.9) + 'px';
+      shadow.style.height = Math.max(8, Math.round(tw * 0.16)) + 'px';
+      shadow.style.opacity = 1 - Math.abs(bob)/18;
+    }
+
+    // 용암 버블 생성 (진행 중에만 몽글몽글)
+    let bubbleTimer = null;
+    function spawnBubble(){
+      const b = document.createElement('span');
+      b.className = 'bubble';
+      const x = Math.random()*100; // % 기준
+      const s = 6 + Math.random()*10; // px
+      b.style.left = x + '%';
+      b.style.width = s + 'px';
+      b.style.height = s + 'px';
+      const dur = 1000 + Math.random()*1400;
+      bubbles.appendChild(b);
+      b.animate([
+        { transform:'translate(-50%, 6px) scale(.8)', opacity:.0 },
+        { transform:'translate(-50%, -26px) scale(1)', opacity:.9, offset:.2 },
+        { transform:'translate(-50%, -58px) scale(.9)', opacity:0 }
+      ], { duration: dur, easing:'cubic-bezier(.3,.8,.2,1)'});
+      setTimeout(()=> b.remove(), dur+30);
+    }
+
+    // 사운드 매니저 (간단한 비프/불 소리)
+    const AudioMgr = (()=>{
+      let ctx=null, gain=null, enabled=true;
+      function ensure(){
+        if(!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)();
+          gain = ctx.createGain(); gain.gain.value = 0.7; gain.connect(ctx.destination); }
+      }
+      async function resume(){ if(ctx && ctx.state==='suspended') await ctx.resume(); }
+      function beep(freq=880, dur=.06){ if(!enabled) return; ensure();
+        const o=ctx.createOscillator(), g=ctx.createGain(); o.type='sine'; o.frequency.value=freq;
+        o.connect(g); g.connect(gain);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime+.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
+        o.start(); o.stop(ctx.currentTime+dur);
+      }
+      function fire(){ if(!enabled) return; ensure(); for(let i=0;i<5;i++){ beep(300+Math.random()*200, 0.08); } }
+      function toggle(){ enabled=!enabled; beep(enabled?780:420,.05); soundBtn.textContent = enabled? '🔊 SOUND' : '🔇 MUTE'; }
+      return {beep, fire, toggle, resume};
+    })();
+
+    // 상단 사운드 토글
+    soundBtn.addEventListener('click', async()=>{ await AudioMgr.resume(); AudioMgr.toggle(); });
+
+    // 로딩 시뮬레이션 + 주사위 롤링
+    let load=0, ready=false, rollIndex=1; setFace(1);
+    const rollTimer = setInterval(()=>{ rollIndex = (rollIndex%6)+1; setFace(rollIndex); }, 120);
+
+    const timer = setInterval(()=>{
+      load = Math.min(100, load + (load<75? Math.random()*8 : Math.random()*3 + 1));
+      fill.style.width = load + '%';
+      updateTokenPosition(load);
+
+      // 진행 중 버블 틱
+      if(!bubbleTimer){ bubbleTimer = setInterval(spawnBubble, 180); }
+
+      if(load>35 && load<70) statusEl.textContent='주사위를 굴리는 중…';
+      if(load>=70 && load<100) statusEl.textContent='던전 문을 여는 중…';
+
+      if(load>=100){
+        clearInterval(timer); clearInterval(rollTimer); clearInterval(bubbleTimer);
+        setFace(6); updateTokenPosition(100);
+        AudioMgr.fire();
+        // 로고 크게 등장 + 바 숨기기 + 클릭 가능
+        diceBar.classList.add('hidden');
+        requestAnimationFrame(()=>{ logo.classList.add('show'); });
+        statusEl.textContent='로딩 완료! 터치 해서 접속하세요!';
+        statusEl.classList.add('ready');
+        veil.classList.add('on');
+        ready = true;
+      }
+    }, 95);
+
+    // 진입 처리(게이트 오픈 → 다음 화면)
+    function openGateAndEnter(){
+      // 로고/인트로가 게이트 애니메이션 동안 보이지 않도록 즉시 숨김
+      veil.classList.remove('on');
+      intro.style.visibility = 'hidden';
+      intro.style.opacity = '0';
+
+      // 게이트 애니메이션 시작
+      gate.classList.add('open');
+
+      // 애니메이션 완료 후 바로 다음 화면으로 전환
+      setTimeout(()=>{
+        document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;background:var(--bg);color:#fff;font-size:2.5rem;font-weight:900;">던전 입장!</div>';
+      }, 720);
+    } 720;
+    
+    async function tryEnter(){ if(!ready) return; await AudioMgr.resume(); AudioMgr.beep(1200,.12); openGateAndEnter(); }
+    veil.addEventListener('click', tryEnter);
+    intro.addEventListener('click', tryEnter);
+    document.addEventListener('keydown', (e)=>{ if(ready && (e.key==='Enter' || e.key===' ')) tryEnter(); });
+  </script>
+</body>
 </html>
+
+
