@@ -86,7 +86,13 @@
             {
                 id: "example",
                 name: "예시",
-                hp: 100,
+                
+                baseStats: {
+                    baseHp: 100,
+                    baseAttack: 100,
+                    baseDefense: 100,
+                },
+
                 reward: {
                     goldRange: {
                         min: 1,
@@ -106,65 +112,61 @@
             {
                 id: "spider",
                 name: "거미",
-                hp: 10,
+                
+                baseStats: {
+                    baseHp: 10,
+                    baseAttack: 2,
+                    baseDefense: 4,
+                },
+                
                 reward: {
                     goldRange: {
                         min: 1,
                         max: 5
                     },
+
+                    itemIds: [
+                        { itemID: "small_potion", weight: 45 },
+                        { itemID: "str_potion", weight: 5 },
+                        { itemID: null, weigth: 50 },
+                    ]
                 }
             },
 
             {
                 id: "wolf",
                 name: "늑대",
-                hp: 15,
+                
+                baseStats: {
+                    baseHp: 10,
+                    baseAttack: 4,
+                    baseDefense: 2,
+                },
+                
                 reward: {
                     goldRange: {
-                        min: 5,
-                        max: 10
+                        min: 1,
+                        max: 5
                     },
+
+                    itemIds: [
+                        { itemID: "small_potion", weight: 45 },
+                        { itemID: "str_potion", weight: 5 },
+                        { itemID: null, weigth: 50 },
+                    ]
                 }
             },
 
             {
                 id: "bear",
                 name: "곰",
-                hp: 50,
-                reward: {
-                    goldRange: {
-                        min: 20,
-                        max: 30
-                    },
+                
+                baseStats: {
+                    baseHp: 50,
+                    baseAttack: 7,
+                    baseDefense: 9,
+                },
 
-                    itemIds: [
-                        { itemID: "medium_potion", weight: 40 },
-                        { itemID: "str_potion", weight: 20 },
-                    ]
-                }
-            },
-
-            {
-                id: "head_wolf",
-                name: "우두머리 늑대",
-                hp: 40,
-                reward: {
-                    goldRange: {
-                        min: 20,
-                        max: 30
-                    },
-
-                    itemIds: [
-                        { itemID: "medium_potion", weight: 40 },
-                        { itemID: "str_potion", weight: 20 },
-                    ]
-                }
-            },
-            
-            {
-                id: "goblin",
-                name: "고블린",
-                hp: 30,
                 reward: {
                     goldRange: {
                         min: 10,
@@ -172,9 +174,81 @@
                     },
 
                     itemIds: [
-                        { itemID: "small_potion", weight: 40 },
-                        { itemID: "medium_potion", weight: 10 },
+                        { itemID: "medium_potion", weight: 40 },
+                        { itemID: "str_potion", weight: 20 },
+                        { itemID: null, weigth: 40 },
+                    ]
+                }
+            },
+
+            {
+                id: "head_wolf",
+                name: "우두머리 늑대",
+
+                baseStats: {
+                    baseHp: 40,
+                    baseAttack: 10,
+                    baseDefense: 5,
+                },
+
+                reward: {
+                    goldRange: {
+                        min: 10,
+                        max: 20
+                    },
+
+                    itemIds: [
+                        { itemID: "medium_potion", weight: 40 },
+                        { itemID: "str_potion", weight: 20 },
+                        { itemID: null, weigth: 40 },
+                    ]
+                }
+            },
+            
+            {
+                id: "goblin",
+                name: "고블린",
+
+                baseStats: {
+                    baseHp: 10,
+                    baseAttack: 3,
+                    baseDefense: 3,
+                },
+
+                reward: {
+                    goldRange: {
+                        min: 1,
+                        max: 5
+                    },
+
+                    itemIds: [
+                        { itemID: "small_potion", weight: 45 },
                         { itemID: "str_potion", weight: 5 },
+                        { itemID: null, weigth: 50 },
+                    ]
+                }
+            },
+
+            {
+                id: "ork",
+                name: "오크",
+
+                baseStats: {
+                    baseHp: 50,
+                    baseAttack: 8,
+                    baseDefense: 8,
+                },
+
+                reward: {
+                    goldRange: {
+                        min: 10,
+                        max: 20
+                    },
+
+                    itemIds: [
+                        { itemID: "medium_potion", weight: 40 },
+                        { itemID: "str_potion", weight: 30 },
+                        { itemID: null, weigth: 30 },
                     ]
                 }
             },
@@ -190,9 +264,11 @@
                 // weight -> 이벤트가 나올 확률 ( 가중치 )
                 randomEvent: [
                     { eventID: "mystery_merchant", weight: 10 },
-                    { eventID: "spider", weight: 55 },
-                    { eventID: "wolf", weight: 35 },
-                ]
+                    { eventID: "spider", weight: 45 },
+                    { eventID: "wolf", weight: 45 },
+                ],
+
+                nextStages: ["forest_enter", "forest_ center"],
             },
 
             {
@@ -203,7 +279,9 @@
                 randomEvent: [
                     { eventID: "bear", weight: 50 },
                     { eventID: "head_wolf", weight: 50 },
-                ]
+                ],
+
+                nextStages: ["forest_enter", "cave_ enter"],
             },
 
             {
@@ -213,9 +291,10 @@
 
                 randomEvent: [
                     { eventID: "mystery_merchant", weight: 10 },
-                    { eventID: "goblin", weight: 65 },
-                    { eventID: "bear", weigth: 25 },
-                ]
+                    { eventID: "goblin", weight: 90 },
+                ],
+
+                nextStages: ["cave_enter", "cave_center"],
             },
 
             {
@@ -225,7 +304,9 @@
 
                 randomEvent: [
                     { eventID: "ork", weight: 100 },
-                ]
+                ],
+
+                nextStages: ["forest_enter", "cave_ center"],
             },
         ]
 
@@ -322,12 +403,16 @@
                 },
                 effect: { 
                     stat: "str",
-                    value: {
-                        minValue: 1,
-                        maxValue: 5
-                    },
                     
-                    direction: "RANDOM"
+                    direction: "RANDOM",
+
+                    valueDrops: [
+                        { amount: 1, weigth: 25 },
+                        { amount: 2, weight: 40 },
+                        { amount: 3, weight: 20 },
+                        { amount: 4, weight: 10 },
+                        { amount: 5, weigth: 5 }
+                    ]
                 },
             },
         ]
