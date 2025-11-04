@@ -203,6 +203,8 @@
     veil.addEventListener('click', tryEnter);
     intro.addEventListener('click', tryEnter);
     document.addEventListener('keydown', (e)=>{ if(ready && (e.key==='Enter' || e.key===' ')) tryEnter(); });
+
+    // 이후로는 게임 내 데이터들
     const ALL_EVENTS = [
         {
             id: "mystery_merchant",
@@ -591,4 +593,5 @@
   </script>
   </body>
 </html>
+
 
