@@ -88,26 +88,26 @@ HTML5 기반의 **랜덤 RPG 게임** 입니다.
 # 인트로 레이아웃 구조
 
 ▪ 상단 사운드 토글 버튼
-------------------------------------------------------------
+```javascript
 <div class="top-ui">
   <button id="sound" class="tiny-btn">🔊 SOUND</button>
 </div>
-------------------------------------------------------------
+```
 - 사운드 온/오프를 제어하는 버튼  
 - 클릭 시 AudioMgr.toggle() 호출, Web Audio API 정책으로 인해 사용자 입력 후만 작동
 
 ▪ 인트로 메인 영역
-------------------------------------------------------------
+```javascript
 <div class="intro" id="intro">
   <img id="logo" src="./gamelogo.png" alt="게임 로고" />
   <div class="status" id="status">자원을 불러오는 중…</div>
 </div>
-------------------------------------------------------------
+```
 - #logo : 로딩 100% 후 페이드인 + 확대 등장  
 - #status : 로딩 중 텍스트 갱신 (“주사위를 굴리는 중…”, “던전 문을 여는 중…” 등)
 
 ▪ 용암 게이지 + 주사위 토큰 로딩바
-------------------------------------------------------------
+```javascript
 <div class="dice-bar" id="diceBar">
   <div class="track rock">
     <div class="fill" id="fill">
@@ -122,7 +122,7 @@ HTML5 기반의 **랜덤 RPG 게임** 입니다.
     <div class="shadow" id="shadow"></div>
   </div>
 </div>
-------------------------------------------------------------
+```
 - .fill 의 width를 통해 진행률 시각화  
 - 내부 레이어 구성  
   - lava-flow : 붉은 용암 흐름  
@@ -131,13 +131,13 @@ HTML5 기반의 **랜덤 RPG 게임** 입니다.
   - lava-gloss : 광택 반사  
 
 ▪ 게이트 및 클릭 베일
-------------------------------------------------------------
+```javascript
 <div class="click-veil" id="veil"></div>
 <div class="gate" id="gate">
   <div class="top"></div>
   <div class="bottom"></div>
 </div>
-------------------------------------------------------------
+```
 - #veil : 로딩 완료 후 클릭/터치 영역 활성화  
 - .gate : 화면 전환 애니메이션 (상하 닫힘)
 
@@ -147,17 +147,17 @@ HTML5 기반의 **랜덤 RPG 게임** 입니다.
 ------------------------------------------------------------
 
 🎲 주사위 눈 관리
-------------------------------------------------------------
+```javascript
 function setFace(n){
   die.querySelectorAll('.pip').forEach(el=>{
     el.style.display = el.classList.contains('f'+n) ? 'block' : 'none';
   });
 }
-------------------------------------------------------------
+```
 - SVG 내부의 점(pip)을 숨기거나 표시해 1~6 눈 구현
 
 주사위 이동/회전/바운스 처리
-------------------------------------------------------------
+```javascript
 function updateTokenPosition(percentage){
   const bw = diceBar.clientWidth;
   const tw = token.offsetWidth || 44;
@@ -167,12 +167,12 @@ function updateTokenPosition(percentage){
   const bob = Math.sin(percentage/100 * Math.PI * 2) * 6;
   token.style.transform += ` translateY(${-Math.abs(bob)}px)`;
 }
-------------------------------------------------------------
+```
 - 로딩바의 실제 픽셀 단위를 기준으로 이동  
 - 회전 + 위아래 바운스 + 그림자 크기 보정  
 
 용암 버블 생성
-------------------------------------------------------------
+```javascript
 function spawnBubble(){
   const b = document.createElement('span');
   b.className = 'bubble';
@@ -190,20 +190,20 @@ function spawnBubble(){
   ], { duration: dur, easing:'cubic-bezier(.3,.8,.2,1)' });
   setTimeout(()=> b.remove(), dur+30);
 }
-------------------------------------------------------------
+```
 - 무작위 크기/위치의 버블을 생성해 부드럽게 떠오르는 효과  
 
 사운드 매니저
-------------------------------------------------------------
+```javascript
 const AudioMgr = (()=>{ ... })();
-------------------------------------------------------------
+```
 - Web Audio API로 구현된 미니 사운드 시스템  
 - fire() : 로딩 완료 시 불타는 듯한 음  
 - beep(freq, dur) : 단일 비프  
 - toggle() : 음소거 토글 + 버튼 상태 갱신  
 
 로딩 시뮬레이션
-------------------------------------------------------------
+```javascript
 const timer = setInterval(()=>{
   load = Math.min(100, load + (load<75? Math.random()*8 : Math.random()*3 + 1));
   fill.style.width = load + '%';
@@ -225,7 +225,7 @@ const timer = setInterval(()=>{
     ready = true;
   }
 }, 95);
-------------------------------------------------------------
+```
 - 가짜 로딩 진행률을 시뮬레이션  
 - 단계별 문구 자동 변경  
 - 100% 도달 시  
@@ -235,7 +235,7 @@ const timer = setInterval(()=>{
   - 클릭 가능 상태로 전환  
 
 게이트 전환 (던전 입장)
-------------------------------------------------------------
+```javascript
 function openGateAndEnter(){
   veil.classList.remove('on');
   intro.style.visibility = 'hidden';
@@ -246,7 +246,7 @@ function openGateAndEnter(){
       '<div style="display:grid;place-items:center;height:100vh;background:var(--bg);color:#fff;font-size:2.5rem;font-weight:900;">던전 입장!</div>';
   }, 720);
 }
-------------------------------------------------------------
+```
 - 클릭 시 인트로 즉시 숨김  
 - 게이트 애니메이션 실행  
 - 완료 후 “던전 입장!” 화면으로 전환  
