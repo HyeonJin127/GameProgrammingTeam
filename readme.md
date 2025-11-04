@@ -28,9 +28,9 @@ let player \= {
 ### **gameState**
 
 플레이어의 현재 행동 상태를 저장하여 버튼 동작을 제어합니다. (탐험중, 전투중, 상점, 인벤토리 등)
-
+~~~
 let gameState; // 'START', 'EXPLORING', 'COMBAT', 'SHOPPING', 'INVENTORY', 'GAME\_OVER'
-
+~~~
 ### **스테이지 진행 변수**
 
 플레이어의 현재 스테이지 위치와 레벨을 추적합니다.
