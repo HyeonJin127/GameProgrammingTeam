@@ -74,6 +74,7 @@ HTML5 기반의 **랜덤 RPG 게임** 입니다.
   #logo { opacity:0; transform:scale(.9); transition:.8s ease; }
   #logo.show { opacity:1; transform:scale(1); }
 
+
 ## 코드별 상세 설명
 
 ### event.html — 인트로 화면 구조 & 로직
