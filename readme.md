@@ -83,9 +83,9 @@ HTML5 기반의 **랜덤 RPG 게임** 입니다.
 #### <head> 구성
 - meta viewport : 모바일 기기 대응 및 반응형 확대 비율 설정  
 - <title> : 브라우저 탭 제목 설정  
-- <link rel="stylesheet" href="intro.css"> : 외부 CSS 파일 연결  
+- link rel="stylesheet" href="intro.css" : 외부 CSS 파일 연결  
 
-#### 인트로 레이아웃 구조
+# 인트로 레이아웃 구조
 
 ▪ 상단 사운드 토글 버튼
 ------------------------------------------------------------
