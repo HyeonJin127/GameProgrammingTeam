@@ -1,95 +1,473 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>주사위 굴리기 시뮬레이터</title>
-    <style>
-        /* CSS 스타일 시작 */
-        body {
-            font-family: 'Arial', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background-color: #f0f0f0;
-            margin: 0;
+// ==========================================
+// 1. 게임 데이터
+// ==========================================
+const ALL_EVENTS = [
+    { id: "mystery_merchant", name: "수상한 상인", itemIds: [{ itemID: "medium_potion", weight: 70 }, { itemID: "large_potion", weight: 20 }, { itemID: "str_potion", weight: 10 }] },
+    { id: "shop", name: "상점", itemIds: ["small_potion", "medium_potion", "large_potion"] },
+    { id: "spider", name: "거미", hp: 10, reward: { goldRange: { min: 1, max: 5 } } },
+    { id: "wolf", name: "늑대", hp: 15, reward: { goldRange: { min: 5, max: 10 } } },
+    { id: "bear", name: "곰", hp: 50, reward: { goldRange: { min: 20, max: 30 }, itemIds: [{ itemID: "medium_potion", weight: 40 }, { itemID: "str_potion", weight: 20 }] } },
+    { id: "head_wolf", name: "우두머리 늑대", hp: 40, reward: { goldRange: { min: 20, max: 30 }, itemIds: [{ itemID: "medium_potion", weight: 40 }, { itemID: "str_potion", weight: 20 }] } },
+    { id: "goblin", name: "고블린", hp: 30, reward: { goldRange: { min: 10, max: 20 }, itemIds: [{ itemID: "small_potion", weight: 40 }, { itemID: "medium_potion", weight: 10 }, { itemID: "str_potion", weight: 5 }] } },
+    { id: "ork", name: "오크", hp: 80, reward: { goldRange: { min: 50, max: 80 } } },
+];
+
+const ALL_STAGES = [
+    { id: "forest_enter", name: "숲 초입부", description: "", randomEvent: [{ eventID: "mystery_merchant", weight: 10 }, { eventID: "spider", weight: 55 }, { eventID: "wolf", weight: 35 }] },
+    { id: "forest_center", name: "숲의 중심 (보스)", description: "왠지 위험한 기분이 든다", randomEvent: [{ eventID: "bear", weight: 50 }, { eventID: "head_wolf", weight: 50 }] },
+    { id: "cave_enter", name: "동굴 입구", description: "", randomEvent: [{ eventID: "mystery_merchant", weight: 10 }, { eventID: "goblin", weight: 65 }, { eventID: "bear", weigth: 25 }] },
+    { id: "cave_deep", name: "동굴 깊은 곳 (보스)", description: "", randomEvent: [{ eventID: "ork", weight: 100 }] },
+];
+
+const ALL_ITEMS = [
+    { id: "small_potion", name: "소형 물약", description: "5 ~ 10 범위내 hp만큼 회복됩니다.", type: "consumable", priceRange: { minPrice: 5, maxPrice: 10 }, effect: { stat: "hp", value: { minValue: 5, maxValue: 10 }, direction: "POSITIVE" } },
+    { id: "medium_potion", name: "중형 물약", description: "15 ~ 25 범위내 hp만큼 회복됩니다.", type: "consumable", priceRange: { minPrice: 10, maxPrice: 15 }, effect: { stat: "hp", value: { minValue: 15, maxValue: 25 }, direction: "POSITIVE" } },
+    { id: "large_potion", name: "대형 물약", description: "40 ~ 50 범위내 hp만큼 회복됩니다.", type: "consumable", priceRange: { minPrice: 20, maxPrice: 30 }, effect: { stat: "hp", value: { minValue: 40, maxValue: 50 }, direction: "POSITIVE" } },
+    { id: "str_potion", name: "수상한 힘의 물약", description: "1 ~ 5 만큼 힘 수치가 오르거나 내려갑니다.", type: "consumable", priceRange: { minPrice: 10, maxPrice: 15 }, effect: { stat: "str", value: { minValue: 1, maxValue: 5 }, direction: "RANDOM" } },
+];
+
+// 스테이지 진행 순서 및 레벨 정의
+const STAGE_PROGRESSION_MAP = {
+    'forest_enter': { nextArea: 'forest_center', levels: 4 }, // 1~4 스테이지
+    'forest_center': { nextArea: 'cave_enter', levels: 1 },    // 5 스테이지 (보스)
+    'cave_enter': { nextArea: 'cave_deep', levels: 4 },
+    'cave_deep': { nextArea: 'GAME_CLEAR', levels: 1 }
+};
+
+// ==========================================
+// 2. 핵심 로직: 상태 변수
+// ==========================================
+
+let player;
+let currentEvent; 
+let gameState; 
+
+// 스테이지 진행 상태 변수
+let currentAreaID;    // 현재 지역
+let stageLevel;         // 현재 지역 내 레벨
+let currentStageData;   // 현재 지역의 데이터
+
+let titleEl, statsEl, resultEl, buttonEl, inventoryButtonEl;
+
+function initializeDOMElements() {
+    titleEl = document.getElementById('main-title');
+    statsEl = document.getElementById('player-stats');
+    resultEl = document.getElementById('dice-result');
+    buttonEl = document.getElementById('main-button');
+    inventoryButtonEl = document.getElementById('inventory-button'); 
+}
+function getRandomInt(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+function findDataById(array, id) {
+    return array.find(item => item.id === id);
+}
+function getWeightedRandom(array) {
+    let totalWeight = 0;
+    for (const item of array) {
+        totalWeight += item.weight || item.weigth || 0;
+    }
+    let randomNum = Math.random() * totalWeight;
+    for (const item of array) {
+        const weight = item.weight || item.weigth || 0;
+        if (randomNum < weight) {
+            return item;
         }
-        #roller-container {
-            background-color: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-            text-align: center;
+        randomNum -= weight;
+    }
+    return array[0];
+}
+
+
+// ==========================================
+// 3. 핵심 로직: UI 업데이트 함수
+// ==========================================
+
+/* 스테이지 레벨 표시 기능 추가 */
+function updatePlayerStatsUI() {
+    if (!statsEl) return;
+    
+    const inventoryCounts = {};
+    for (const itemId of player.inventory) {
+        inventoryCounts[itemId] = (inventoryCounts[itemId] || 0) + 1;
+    }
+    
+    let inventoryText = '없음';
+    if (player.inventory.length > 0) {
+        inventoryText = Object.keys(inventoryCounts).map(id => {
+            const item = findDataById(ALL_ITEMS, id);
+            return `${item.name} x${inventoryCounts[id]}`;
+        }).join(', ');
+    }
+
+    //현재 스테이지 레벨 표시
+    let stageText = "??";
+    if (currentAreaID) {
+        const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+        const maxLevel = areaInfo.levels;
+        stageText = `Stage: ${currentStageData.name} (${stageLevel}/${maxLevel})`;
+    }
+
+    statsEl.innerHTML = `HP: ${player.hp} / ${player.maxHp} | STR: ${player.str} | Gold: ${player.gold}<br>인벤토리: ${inventoryText}<br><b>${stageText}</b>`;
+}
+
+function updateMainUI(title, result, buttonText) {
+    if (!titleEl || !resultEl || !buttonEl) return; 
+    titleEl.textContent = title;
+    resultEl.innerHTML = result; 
+    buttonEl.textContent = buttonText;
+    
+    resultEl.style.flexDirection = 'column';
+    resultEl.style.textAlign = 'center';
+}
+
+function setUIForAction(showMain = false, showInventory = false) {
+    buttonEl.style.display = showMain ? 'block' : 'none';
+    inventoryButtonEl.style.display = showInventory ? 'block' : 'none';
+}
+
+
+// ==========================================
+// 4. 핵심 로직: 게임 플레이 함수
+// ==========================================
+
+/* 스테이지 진행 변수 초기화 */
+function startGame() {
+    player = {
+        hp: 100,
+        maxHp: 100,
+        str: 10,
+        gold: 0,
+        inventory: [] 
+    };
+    
+    //스테이지 상태 초기화
+    currentAreaID = 'forest_enter';
+    currentStageData = findDataById(ALL_STAGES, currentAreaID);
+    stageLevel = 1;
+
+    gameState = 'EXPLORING';
+
+    updatePlayerStatsUI();
+    updateMainUI(currentStageData.name, "무엇을 하시겠습니까?", "탐험하기");
+    setUIForAction(true, true); 
+}
+
+function handleMainAction() {
+    switch (gameState) {
+        case 'START':
+        case 'GAME_OVER':
+            startGame();
+            break;
+        case 'EXPLORING':
+            triggerRandomEvent();
+            break;
+        case 'COMBAT':
+            attackMonster();
+            break;
+    }
+}
+
+function handleInventoryAction() {
+    if (gameState === 'EXPLORING' || gameState === 'START' || gameState === 'GAME_OVER') {
+        displayInventory();
+    }
+}
+
+/* '탐험하기' - 현재 스테이지 데이터 사용 */
+function triggerRandomEvent() {
+    const eventRoll = getWeightedRandom(currentStageData.randomEvent); // 현재 지역 데이터 사용
+    const eventData = findDataById(ALL_EVENTS, eventRoll.eventID);
+
+    if (!eventData) {
+        console.error(`이벤트 데이터를 찾을 수 없습니다: ${eventRoll.eventID}`);
+        updateMainUI(currentStageData.name, "아무것도 발견하지 못했다.", "탐험하기");
+        return;
+    }
+
+    currentEvent = { ...eventData }; 
+
+    if (eventData.hp) {
+        gameState = 'COMBAT';
+        updateMainUI(`몬스터 출현!`, `${currentEvent.name} (HP: ${currentEvent.hp})`, "공격하기");
+        setUIForAction(true, false); 
+    } 
+    else if (eventData.id === "mystery_merchant" || eventData.id === "shop") {
+        gameState = 'SHOPPING';
+        generateShopInventory(eventData); 
+        displayShopUI(); 
+    }
+}
+
+function attackMonster() {
+    const playerDamage = getRandomInt(player.str - 2, player.str + 2); 
+    currentEvent.hp -= playerDamage;
+    let logMessage = `[플레이어] ${currentEvent.name}에게 ${playerDamage}의 피해!`;
+
+    if (currentEvent.hp <= 0) {
+        winCombat(); 
+        return;
+    }
+
+    const monsterDamage = getRandomInt(3, 8); 
+    player.hp -= monsterDamage;
+    logMessage += `<br>[${currentEvent.name}] 플레이어에게 ${monsterDamage}의 피해!`;
+
+    if (player.hp <= 0) {
+        player.hp = 0;
+        loseGame();
+    } else {
+        updatePlayerStatsUI();
+        updateMainUI('전투 중!', `${currentEvent.name} (HP: ${currentEvent.hp})`, "공격하기");
+        resultEl.innerHTML = logMessage;
+        setUIForAction(true, false); 
+    }
+}
+
+/* 전투 승리 시 스테이지 진행 로직 */
+function winCombat() {
+    const reward = currentEvent.reward;
+    let gainedGold = 0;
+    let gainedItem = null;
+    let resultMessage = `${currentEvent.name} 처치!`;
+
+    // 1. 보상
+    if (reward.goldRange) {
+        gainedGold = getRandomInt(reward.goldRange.min, reward.goldRange.max);
+        player.gold += gainedGold;
+        resultMessage += `<br>(+${gainedGold} Gold)`;
+    }
+    if (reward.itemIds && reward.itemIds.length > 0) {
+        const droppedItemInfo = getWeightedRandom(reward.itemIds); 
+        const itemData = findDataById(ALL_ITEMS, droppedItemInfo.itemID);
+        if (itemData) {
+            player.inventory.push(itemData.id); 
+            gainedItem = itemData;
+            resultMessage += `<br>(${gainedItem.name} 획득!)`;
         }
-        h1 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-        #dice-result {
-            font-size: 80px;
-            font-weight: bold;
-            color: #d9534f;
-            margin: 20px 0;
-            min-height: 90px;
-        }
-        button {
-            padding: 12px 25px;
-            font-size: 1.2em;
-            background-color: #5cb85c;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #449d44;
-        }
-        /* CSS 스타일 끝 */
-    </style>
-</head>
-<body>
-    <div id="roller-container">
-        <h1>랜덤한 난수를 생성합니다</h1>
+    }
+    
+    gameState = 'EXPLORING';
+    currentEvent = null; 
+    
+    // 2. 스테이지 진행 로직
+    stageLevel++;
+    const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+    
+    if (stageLevel > areaInfo.levels) {
+        // 다음 지역으로 이동
+        const nextAreaID = areaInfo.nextArea;
         
-        <div id="dice-result">?</div>
-        
-        <button onclick="rollDice()">난수 생성</button>
-
-        <p id="roll-count">총 생성 횟수: 0</p>
-    </div>
-
-    <script>
-        let count = 0; // 생성 횟수를 저장할 변수
-
-        function rollDice() {
-            // 1. 무작위 숫자 생성: 1에서 100 사이의 정수 생성
-            // Math.random()은 0 (포함)에서 1 (제외) 사이의 부동 소수점 숫자를 반환합니다.
-            // Math.floor(Math.random() * 100)는 0부터 99까지의 정수를 만들고,
-            // + 1을 더해 1부터 100까지의 정수로 만듭니다.
-            const randomNumber = Math.floor(Math.random() * 100) + 1;
-
-            // 2. DOM 업데이트: 결과 값을 화면에 표시
-            const resultElement = document.getElementById('dice-result');
-            resultElement.textContent = randomNumber;
-
-            // 3. 횟수 카운트 및 업데이트
-            count++;
-            document.getElementById('roll-count').textContent = `총 굴린 횟수: ${count}`;
-
-            // (선택 사항) 결과에 따른 시각적 피드백
-            resultElement.style.transform = 'rotate(0deg)';
-            resultElement.style.transition = 'none';
-            
-            // 짧은 시간 후 애니메이션 적용
-            setTimeout(() => {
-                resultElement.style.transition = 'transform 0.2s ease-out';
-                // 무작위로 약간 회전시켜 생동감을 더합니다.
-                const randomRotation = Math.floor(Math.random() * 20) - 10; 
-                resultElement.style.transform = `rotate(${randomRotation}deg) scale(1.1)`;
-            }, 10);
+        if (nextAreaID === 'GAME_CLEAR') {
+            winGame();
+            return; // 게임 클리어
         }
-    </script>
-    </body>
-</html>
+        
+        currentAreaID = nextAreaID;
+        currentStageData = findDataById(ALL_STAGES, currentAreaID);
+        stageLevel = 1;
+        resultMessage += `<br><br><b>다음 지역 [${currentStageData.name}] (으)로 이동합니다!</b>`;
+        
+    } else {
+        // 현재 지역 탐험 계속
+        resultMessage += `<br><br>다음 스테이지 (${stageLevel}/${areaInfo.levels}) 로 이동합니다.`;
+    }
+    
+    updatePlayerStatsUI();
+    updateMainUI(currentStageData.name, resultMessage, "탐험하기");
+    setUIForAction(true, true); 
+}
+
+function loseGame() {
+    gameState = 'GAME_OVER';
+    updatePlayerStatsUI();
+    updateMainUI("게임 오버", "사망했습니다...", "다시 시작하기");
+    setUIForAction(true, true); 
+}
+
+/*게임 클리어 함수 */
+function winGame() {
+    gameState = 'GAME_OVER'; // (재시작 가능하도록)
+    updatePlayerStatsUI();
+    updateMainUI("GAME CLEAR!", "축하합니다! 모든 스테이지를 클리어했습니다!", "다시 시작하기");
+    setUIForAction(true, true);
+}
+
+// ==========================================
+// 5. 상점 로직 함수 (v1과 동일)
+// ==========================================
+
+function generateShopInventory(eventData) {
+    currentEvent.inventory = []; 
+    let itemIDList = [];
+
+    if (eventData.id === 'shop') {
+        itemIDList = eventData.itemIds;
+    } else if (eventData.id === 'mystery_merchant') {
+        itemIDList = eventData.itemIds.map(item => item.itemID); 
+    }
+
+    for (const id of itemIDList) {
+        const itemData = findDataById(ALL_ITEMS, id);
+        if (itemData) {
+            const price = getRandomInt(itemData.priceRange.minPrice, itemData.priceRange.maxPrice);
+            currentEvent.inventory.push({ ...itemData, price: price });
+        }
+    }
+}
+
+function displayShopUI() {
+    titleEl.textContent = currentEvent.name; 
+    resultEl.innerHTML = ''; 
+    resultEl.style.textAlign = 'left';
+    setUIForAction(false, false); 
+
+    for (const item of currentEvent.inventory) {
+        const itemButton = document.createElement('button');
+        itemButton.textContent = `구매: ${item.name} (${item.price} Gold) - ${item.description}`;
+        itemButton.onclick = () => buyItem(item); 
+        resultEl.appendChild(itemButton);
+    }
+
+    const exitButton = document.createElement('button');
+    exitButton.textContent = '가게 나가기';
+    exitButton.className = 'exit-button'; 
+    exitButton.onclick = () => exitShop(); 
+    resultEl.appendChild(exitButton);
+}
+
+function buyItem(itemToBuy) {
+    if (player.gold >= itemToBuy.price) {
+        player.gold -= itemToBuy.price;
+        player.inventory.push(itemToBuy.id);
+        updatePlayerStatsUI(); 
+        alert(`${itemToBuy.name}을(를) 구매했습니다.`);
+    } else {
+        alert('골드가 부족합니다.');
+    }
+}
+
+function exitShop() {
+    gameState = 'EXPLORING';
+    currentEvent = null;
+    updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
+    setUIForAction(true, true); 
+}
+
+
+// ==========================================
+// 6. 인벤토리 및 아이템 사용 로직 (v1과 동일)
+// ==========================================
+
+function displayInventory() {
+    gameState = 'INVENTORY';
+    titleEl.textContent = '인벤토리';
+    resultEl.innerHTML = ''; 
+    resultEl.style.textAlign = 'left'; 
+    setUIForAction(false, false); 
+
+    if (player.inventory.length === 0) {
+        resultEl.textContent = '가진 아이템이 없습니다.';
+    }
+
+    const inventoryCounts = {};
+    for (const itemId of player.inventory) {
+        inventoryCounts[itemId] = (inventoryCounts[itemId] || 0) + 1;
+    }
+
+    for (const itemId in inventoryCounts) {
+        const item = findDataById(ALL_ITEMS, itemId);
+        if (item && item.type === 'consumable') {
+            const itemButton = document.createElement('button');
+            itemButton.textContent = `사용: ${item.name} (x${inventoryCounts[itemId]}) - ${item.description}`;
+            itemButton.onclick = () => useItem(item); 
+            resultEl.appendChild(itemButton);
+        }
+    }
+    
+    const exitButton = document.createElement('button');
+    exitButton.textContent = '탐험으로 돌아가기';
+    exitButton.className = 'exit-button';
+    exitButton.onclick = () => exitInventory(); 
+    resultEl.appendChild(exitButton);
+}
+
+/*스테이지 진행 상태에 맞게 복귀 */
+function exitInventory() {
+    if (player.hp <= 0) {
+        loseGame(); 
+    } else if (gameState === 'GAME_CLEAR') {
+        winGame();
+    } else {
+        gameState = 'EXPLORING';
+        updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
+        setUIForAction(true, true); 
+    }
+}
+
+function useItem(itemToUse) {
+    const itemIndex = player.inventory.indexOf(itemToUse.id);
+    if (itemIndex === -1) {
+        alert("오류: 해당 아이템이 없습니다.");
+        displayInventory(); 
+        return;
+    }
+    player.inventory.splice(itemIndex, 1); 
+
+    const effect = itemToUse.effect;
+    const value = getRandomInt(effect.value.minValue, effect.value.maxValue);
+    let changeValue = 0;
+
+    if (effect.direction === "POSITIVE") {
+        changeValue = value;
+    } else if (effect.direction === "NEGATIVE") {
+        changeValue = -value;
+    } else if (effect.direction === "RANDOM") {
+        changeValue = (Math.random() < 0.5) ? value : -value;
+    }
+
+    let effectMessage = "";
+
+    if (effect.stat === "hp") {
+        player.hp += changeValue;
+        if (player.hp > player.maxHp) {
+            player.hp = player.maxHp; 
+        }
+        effectMessage = `HP가 ${changeValue}만큼 회복되었습니다. (현재 HP: ${player.hp})`;
+    } 
+    else if (effect.stat === "str") {
+        player.str += changeValue;
+        effectMessage = `힘(STR)이 ${changeValue}만큼 변동했습니다. (현재 STR: ${player.str})`;
+    }
+
+    alert(effectMessage);
+    updatePlayerStatsUI(); 
+    displayInventory(); 
+}
+
+
+// ==========================================
+// 7. 게임 시작 (HTML 로드 완료 후 실행)
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', (event) => {
+    initializeDOMElements();
+    
+    if (buttonEl) {
+        buttonEl.onclick = handleMainAction;
+    } else {
+        console.error("메인 버튼 (id='main-button')을 찾을 수 없습니다.");
+    }
+    
+    if (inventoryButtonEl) {
+        inventoryButtonEl.onclick = handleInventoryAction;
+    } else {
+        console.error("인벤토리 버튼 (id='inventory-button')을 찾을 수 없습니다.");
+    }
+
+    gameState = 'START';
+    updateMainUI("주사위 굴리기 RPG", "게임을 시작하세요!", "게임 시작");
+    setUIForAction(true, true); 
+});
