@@ -1,4 +1,3 @@
-// (참고) 이 로직은 'game_v4_with_intro.html' 파일에서 사용됩니다.
 // HTML 인트로 애니메이션이 끝난 후,
 // 'loadMainGameUI()' 함수가 'initializeDOMElements()'와 'startGame()'을
 // 수동으로 호출하여 게임을 시작합니다.
