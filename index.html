@@ -227,7 +227,7 @@
                 name: "상점",
 
                 // 등장하는 아이템들
-                itemIds: [ "small_potion", "medium_potion", "large_potion" ]
+                itemIds: [ "small_potion", "medium_potion", "large_potion", "str_potion" ]
             },
             
             // 몬스터 구조 예시
@@ -429,7 +429,7 @@
                     { eventID: "head_wolf", weight: 50 },
                 ],
 
-                nextStages: ["forest_enter", "cave_ enter"],
+                nextStages: ["forest_enter", "cave_ enter", "shop"],
             },
 
             {
@@ -454,7 +454,19 @@
                     { eventID: "ork", weight: 100 },
                 ],
 
-                nextStages: ["forest_enter", "cave_ center"],
+                nextStages: ["forest_enter", "cave_ center", "shop"],
+            },
+
+            {
+                id: "shop",
+                name: "상점",
+                description: "",
+
+                randomEvent: [
+                    { eventID: "shop", weight: 100 },
+                ],
+
+                nextStages: ["forest_enter", "cave_enter"],
             },
         ]
 
@@ -597,3 +609,4 @@
     </script>
     </body>
 </html>
+
