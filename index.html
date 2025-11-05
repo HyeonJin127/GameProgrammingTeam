@@ -38,7 +38,7 @@
         </div>
       </div>
 
-      <!-- 진행을 따라 움직이는 주사위 토큰 -->
+      <!-- 진행선 따라 움직이는 주사위 토큰 -->
       <div class="token" id="token" aria-hidden="true">
         <svg class="die" viewBox="0 0 200 200" data-face="1">
           <rect x="10" y="10" width="180" height="180" rx="28" ry="28" fill="#fff" stroke="#111" stroke-width="6"></rect>
@@ -59,6 +59,25 @@
   <div class="click-veil" id="veil" aria-hidden="true"></div>
   <div class="gate" id="gate"><div class="top"></div><div class="bottom"></div></div>
 
+  <div class="game-container" id="gameContainer" style="display:none;">
+    <div class="header-panel">
+        <h2 id="main-title">던전 오브 다이스</h2>
+    </div>
+
+    <div class="stats-panel">
+        <p id="player-stats">로딩 중...</p>
+    </div>
+    
+    <div class="result-panel">
+        <div id="dice-result" class="result-text">로딩 완료!</div>
+    </div>
+
+    <div class="action-panel">
+        <button id="main-button">액션</button>
+        <button id="inventory-button">인벤토리</button>
+    </div>
+</div>
+  
   <script>
     /* ========================
        인트로 로직 (로딩 → 준비완료 → 클릭 진입)
@@ -184,20 +203,35 @@
     }, 95);
 
     // 진입 처리(게이트 오픈 → 다음 화면)
-    function openGateAndEnter(){
-      // 로고/인트로가 게이트 애니메이션 동안 보이지 않도록 즉시 숨김
-      veil.classList.remove('on');
-      intro.style.visibility = 'hidden';
-      intro.style.opacity = '0';
+    function openGateAndEnter() {
+    // 로고/인트로가 게이트 애니메이션 동안 보이지 않도록 즉시 숨김
+    veil.classList.remove('on');
+    intro.style.visibility = 'hidden';
+    intro.style.opacity = '0';
 
-      // 게이트 애니메이션 시작
-      gate.classList.add('open');
+    // 게이트 애니메이션 시작
+    gate.classList.add('open');
 
-      // 애니메이션 완료 후 바로 다음 화면으로 전환
-      setTimeout(()=>{
-        document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;background:var(--bg);color:#fff;font-size:2.5rem;font-weight:900;">던전 입장!</div>';
-      }, 720);
-    } 720;
+    // 애니메이션 완료 후 메인 UI 표시 및 게임 시작
+    setTimeout(()=>{
+        // 1. 인트로 관련 요소를 DOM에서 완전히 제거하거나 숨기기
+        //   -> 인트로 컨테이너를 display: none; 처리하여 공간을 차지하지 않도록 합니다.
+        intro.style.display = 'none'; // ⭐ 이 부분이 핵심입니다! ⭐
+        
+        // 2. 메인 UI 요소 초기화 (DOM에 추가되었으므로)
+        initializeDOMElements(); 
+        
+        // 3. 메인 게임 컨테이너를 보이게 설정 (이전에 추가하신 HTML 구조)
+        gameContainerEl.style.display = 'block';
+        
+        // 4. 메인 액션 버튼 이벤트 리스너 연결 (추가된 기능)
+        buttonEl.addEventListener('click', handleMainAction);
+        inventoryButtonEl.addEventListener('click', handleInventoryAction);
+
+        // 5. 게임 시작 함수 호출
+        startGame();
+    }, 720); // 게이트 애니메이션 시간 (720ms)과 일치
+}
     
     async function tryEnter(){ if(!ready) return; await AudioMgr.resume(); AudioMgr.beep(1200,.12); openGateAndEnter(); }
     veil.addEventListener('click', tryEnter);
@@ -223,7 +257,7 @@
             name: "상점",
 
             // 등장하는 아이템들
-            itemIds: [ "small_potion", "medium_potion", "large_potion" ]
+            itemIds: [ "small_potion", "medium_potion", "large_potion", "str_potion" ]
         },
         
         // 몬스터 구조 예시
@@ -272,7 +306,7 @@
                 itemIds: [
                     { itemID: "small_potion", weight: 45 },
                     { itemID: "str_potion", weight: 5 },
-                    { itemID: null, weigth: 50 },
+                    { itemID: null, weight: 50 },
                 ]
             }
         },
@@ -296,7 +330,7 @@
                 itemIds: [
                     { itemID: "small_potion", weight: 45 },
                     { itemID: "str_potion", weight: 5 },
-                    { itemID: null, weigth: 50 },
+                    { itemID: null, weight: 50 },
                 ]
             }
         },
@@ -320,7 +354,7 @@
                 itemIds: [
                     { itemID: "medium_potion", weight: 40 },
                     { itemID: "str_potion", weight: 20 },
-                    { itemID: null, weigth: 40 },
+                    { itemID: null, weight: 40 },
                 ]
             }
         },
@@ -344,7 +378,7 @@
                 itemIds: [
                     { itemID: "medium_potion", weight: 40 },
                     { itemID: "str_potion", weight: 20 },
-                    { itemID: null, weigth: 40 },
+                    { itemID: null, weight: 40 },
                 ]
             }
         },
@@ -368,7 +402,7 @@
                 itemIds: [
                     { itemID: "small_potion", weight: 45 },
                     { itemID: "str_potion", weight: 5 },
-                    { itemID: null, weigth: 50 },
+                    { itemID: null, weight: 50 },
                 ]
             }
         },
@@ -392,7 +426,7 @@
                 itemIds: [
                     { itemID: "medium_potion", weight: 40 },
                     { itemID: "str_potion", weight: 30 },
-                    { itemID: null, weigth: 30 },
+                    { itemID: null, weight: 30 },
                 ]
             }
         },
@@ -412,7 +446,7 @@
                 { eventID: "wolf", weight: 45 },
             ],
 
-            nextStages: ["forest_enter", "forest_ center"],
+            nextStages: ["forest_enter", "forest_center"],
         },
 
         {
@@ -425,7 +459,7 @@
                 { eventID: "head_wolf", weight: 50 },
             ],
 
-            nextStages: ["forest_enter", "cave_ enter"],
+            nextStages: ["forest_enter", "cave_enter", "shop"],
         },
 
         {
@@ -450,8 +484,21 @@
                 { eventID: "ork", weight: 100 },
             ],
 
-            nextStages: ["forest_enter", "cave_ center"],
+            nextStages: ["forest_enter", "cave_enter", "shop"],
         },
+
+	{
+            id: "shop",
+            name: "상점",
+            description: "",
+
+            randomEvent: [
+                { eventID: "shop", weight: 100 },
+            ],
+
+            nextStages: ["forest_enter", "cave_enter"],
+        },
+
     ]
 
     // 아이템 구조
@@ -551,47 +598,441 @@
                 direction: "RANDOM",
 
                 valueDrops: [
-                    { amount: 1, weigth: 25 },
+                    { amount: 1, weight: 25 },
                     { amount: 2, weight: 40 },
                     { amount: 3, weight: 20 },
                     { amount: 4, weight: 10 },
-                    { amount: 5, weigth: 5 }
+                    { amount: 5, weight: 5 }
                 ]
             },
         },
     ]
 
-    let count = 0; // 생성 횟수를 저장할 변수
+// ==========================================
+// 2. 핵심 변수 및 헬퍼 함수
+// ==========================================
+let player;
+let currentAreaID;
+let stageLevel;
+let currentStageData;
+let currentEvent; 
+let gameState; 
+let titleEl, statsEl, resultEl, buttonEl, inventoryButtonEl, gameContainerEl;
 
-    function rollDice() {
-        // 1. 무작위 숫자 생성: 1에서 100 사이의 정수 생성
-        // Math.random()은 0 (포함)에서 1 (제외) 사이의 부동 소수점 숫자를 반환합니다.
-        // Math.floor(Math.random() * 100)는 0부터 99까지의 정수를 만들고,
-        // + 1을 더해 1부터 100까지의 정수로 만듭니다.
-        const randomNumber = Math.floor(Math.random() * 100) + 1;
+const STAGE_PROGRESSION_MAP = {
+    'forest_enter': { nextArea: 'forest_center', levels: 4 }, // 1~4 스테이지
+    'forest_center': { nextArea: 'shop', levels: 1 },    // 5 스테이지 (보스)
+    'shop': {nextArea: 'cave_enter', levels: 1},
+    'cave_enter': { nextArea: 'cave_deep', levels: 4 },
+    'cave_deep': { nextArea: 'GAME_CLEAR', levels: 1 }
+};
 
-        // 2. DOM 업데이트: 결과 값을 화면에 표시
-        const resultElement = document.getElementById('dice-result');
-        resultElement.textContent = randomNumber;
+function initializeDOMElements() {
+    // 추가된 메인 컨테이너
+    gameContainerEl = document.getElementById('gameContainer');
+  
+    titleEl = document.getElementById('main-title');
+    statsEl = document.getElementById('player-stats');
+    resultEl = document.getElementById('dice-result');
+    buttonEl = document.getElementById('main-button');
+    inventoryButtonEl = document.getElementById('inventory-button');
+}
 
-        // 3. 횟수 카운트 및 업데이트
-        count++;
-        document.getElementById('roll-count').textContent = `총 굴린 횟수: ${count}`;
+function getRandomInt(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-        // (선택 사항) 결과에 따른 시각적 피드백
-        resultElement.style.transform = 'rotate(0deg)';
-        resultElement.style.transition = 'none';
-        
-        // 짧은 시간 후 애니메이션 적용
-        setTimeout(() => {
-            resultElement.style.transition = 'transform 0.2s ease-out';
-            // 무작위로 약간 회전시켜 생동감을 더합니다.
-            const randomRotation = Math.floor(Math.random() * 20) - 10; 
-            resultElement.style.transform = `rotate(${randomRotation}deg) scale(1.1)`;
-        }, 10);
+function findDataById(array, id) {
+    return array.find(item => item.id === id);
+}
+
+function getWeightedRandom(array) {
+    let totalWeight = 0;
+    for (const item of array) {
+        totalWeight += item.weight || 0;
     }
+    let randomNum = Math.random() * totalWeight;
+    for (const item of array) {
+        const weight = item.weight || 0;
+        if (randomNum < weight) {
+            return item;
+        }
+        randomNum -= weight;
+    }
+    return array[0];
+}
+
+// ==========================================
+// 3. UI 업데이트 함수
+// ==========================================
+function updatePlayerStatsUI() {
+    if (!statsEl) return;
+    const inventoryCounts = {};
+    for (const itemId of player.inventory) {
+        inventoryCounts[itemId] = (inventoryCounts[itemId] || 0) + 1;
+    }
+    let inventoryText = '없음';
+    if (player.inventory.length > 0) {
+        inventoryText = Object.keys(inventoryCounts).map(id => {
+            const item = findDataById(ALL_ITEMS, id);
+            return `${item.name} x${inventoryCounts[id]}`;
+        }).join(', ');
+    }
+    const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+    statsEl.innerHTML = `<b>Stage: ${currentStageData.name} (${stageLevel}/${areaInfo.levels})</b><br>
+                         HP: ${player.hp} / ${player.maxHp} | ATK: ${player.attack} | DEF: ${player.defense} | Gold: ${player.gold}<br>
+                         인벤토리: ${inventoryText}`;
+}
+
+function updateMainUI(title, result, buttonText) {
+    if (!titleEl || !resultEl || !buttonEl) return; 
+    titleEl.textContent = title;
+    resultEl.innerHTML = result; 
+    buttonEl.textContent = buttonText;
+    resultEl.style.flexDirection = 'column';
+    resultEl.style.textAlign = 'center';
+}
+
+function setUIForAction(showMain = false, showInventory = false) {
+    if (buttonEl) buttonEl.style.display = showMain ? 'block' : 'none';
+    if (inventoryButtonEl) inventoryButtonEl.style.display = showInventory ? 'block' : 'none';
+}
+
+// ==========================================
+// 4. 게임 플레이 함수
+// ==========================================
+function startGame() {
+    player = {
+        hp: 100, maxHp: 100, attack: 10, defense: 5, gold: 0, inventory: [] 
+    };
+    currentAreaID = 'forest_enter';
+    currentStageData = findDataById(ALL_STAGES, currentAreaID);
+    stageLevel = 1;
+    gameState = 'EXPLORING';
+    updatePlayerStatsUI();
+    updateMainUI(currentStageData.name, "무엇을 하시겠습니까?", "탐험하기");
+    setUIForAction(true, true); 
+}
+
+function handleMainAction() {
+    switch (gameState) {
+        case 'START':
+        case 'GAME_OVER':
+            startGame();
+            break;
+        case 'EXPLORING':
+            triggerRandomEvent();
+            break;
+        case 'COMBAT':
+            attackMonster();
+            break;
+        case 'AREA_CLEAR':
+            // 이 케이스는 winCombat에서 버튼 핸들러를 직접 변경하므로 여기서는 처리 안함
+            break;
+    }
+}
+
+function handleInventoryAction() {
+    if (gameState === 'EXPLORING' || gameState === 'START' || gameState === 'GAME_OVER') {
+        displayInventory();
+    }
+}
+
+function triggerRandomEvent() {
+    const eventRoll = getWeightedRandom(currentStageData.randomEvent); 
+    const eventData = findDataById(ALL_EVENTS, eventRoll.eventID);
+    if (!eventData) {
+        console.error(`이벤트 데이터를 찾을 수 없습니다: ${eventRoll.eventID}`);
+        updateMainUI(currentStageData.name, "아무것도 발견하지 못했다.", "탐험하기");
+        return;
+    }
+    if (eventData.baseStats) {
+        gameState = 'COMBAT';
+        currentEvent = {
+            ...eventData, 
+            currentHp: eventData.baseStats.baseHp,
+            attack: eventData.baseStats.baseAttack,
+            defense: eventData.baseStats.baseDefense
+        };
+        updateMainUI(`몬스터 출현!`, `${currentEvent.name} (HP: ${currentEvent.currentHp})`, "공격하기");
+        setUIForAction(true, false); 
+    } 
+    else if (eventData.id === "mystery_merchant" || eventData.id === "shop") {
+        gameState = 'SHOPPING';
+        currentEvent = { ...eventData };
+        displayShopUI(); 
+    }
+}
+
+function attackMonster() {
+    let logMessage = "";
+    const playerRawDamage = getRandomInt(player.attack - 2, player.attack + 2);
+    const monsterDefense = currentEvent.defense;
+    const playerDamage = Math.max(1, playerRawDamage - monsterDefense); 
+    currentEvent.currentHp -= playerDamage;
+    logMessage += `[플레이어] ${currentEvent.name}에게 ${playerDamage}의 피해! (방어: ${monsterDefense})`;
+    if (currentEvent.currentHp <= 0) {
+        winCombat(); 
+        return;
+    }
+    const monsterRawDamage = getRandomInt(currentEvent.attack - 1, currentEvent.attack + 1);
+    const playerDefense = player.defense;
+    const monsterDamage = Math.max(1, monsterRawDamage - playerDefense); 
+    player.hp -= monsterDamage;
+    logMessage += `<br>[${currentEvent.name}] 플레이어에게 ${monsterDamage}의 피해! (방어: ${playerDefense})`;
+    if (player.hp <= 0) {
+        player.hp = 0;
+        loseGame();
+    } else {
+        updatePlayerStatsUI();
+        updateMainUI('전투 중!', `${currentEvent.name} (HP: ${currentEvent.currentHp})`, "공격하기");
+        resultEl.innerHTML = logMessage;
+        setUIForAction(true, false); 
+    }
+}
+
+function advanceStage() {
+    // 1. 현재 지역의 진행 정보를 STAGE_PROGRESSION_MAP에서 찾습니다.
+    const mapEntry = STAGE_PROGRESSION_MAP[currentAreaID];
+
+    if (mapEntry) {
+        // 2. 다음 지역 ID가 'GAME_CLEAR'인 경우 게임 클리어 로직 실행
+        if (mapEntry.nextArea === 'GAME_CLEAR') {
+            winGame();
+            return;
+        }
+        
+        // 3. 다음 지역으로 이동
+        currentAreaID = mapEntry.nextArea;
+        stageLevel = 1; // 새 지역에서는 레벨을 1로 초기화
+        currentStageData = findDataById(ALL_STAGES, currentAreaID); // ⭐ currentStageData 업데이트
+        
+        // 4. UI를 업데이트하고 다음 지역 탐험을 준비합니다.
+        gameState = 'EXPLORING';
+        updatePlayerStatsUI();
+        updateMainUI(currentStageData.name, `${currentStageData.name}에 진입했습니다.`, "탐험하기"); 
+        setUIForAction(true, true);
+    }
+}
+
+function winCombat() {
+    const reward = currentEvent.reward;
+    let gainedGold = 0;
+    let resultMessage = `${currentEvent.name} 처치!`;
+    if (reward.goldRange) {
+        gainedGold = getRandomInt(reward.goldRange.min, reward.goldRange.max);
+        player.gold += gainedGold;
+        resultMessage += `<br>(+${gainedGold} Gold)`;
+    }
+    if (reward.itemIds && reward.itemIds.length > 0) {
+        const droppedItemInfo = getWeightedRandom(reward.itemIds); 
+        if (droppedItemInfo && droppedItemInfo.itemID) {
+            const itemData = findDataById(ALL_ITEMS, droppedItemInfo.itemID);
+            if (itemData) {
+                player.inventory.push(itemData.id); 
+                resultMessage += `<br>(${itemData.name} 획득!)`;
+            }
+        } else {
+            resultMessage += `<br>(아이템 없음)`;
+        }
+    }
+    
+    currentEvent = null; 
+    
+    // 다음 지역으로 진행해야 하는지 확인합니다.
+    const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+    const nextStageLevel = stageLevel + 1; // 다음 스테이지 레벨 계산
+    
+    if (nextStageLevel > areaInfo.levels) {
+        // 현재 지역의 모든 레벨(몬스터)을 클리어했습니다.
+        // 다음 지역으로 진행합니다.
+        
+        resultMessage += `<br><br><b>🎉 지역 클리어! 🎉</b><br>다음 지역으로 이동합니다...`;
+        gameState = 'AREA_CLEAR';
+        
+        // 현재 스테이지 레벨을 유지한 채로 UI 업데이트 (아직 증가시키지 않음)
+        updatePlayerStatsUI();
+        updateMainUI(currentStageData.name, resultMessage, "다음 지역으로");
+        setUIForAction(true, false);
+        
+        // 버튼 클릭 이벤트를 일시적으로 변경
+        const originalHandler = buttonEl.onclick;
+        buttonEl.onclick = () => {
+            buttonEl.onclick = originalHandler; // 원래 핸들러로 복구
+            stageLevel++; // 이제 스테이지 레벨 증가
+            advanceStage();
+        };
+        
+        return;
+    } else {
+        // 현재 지역 내 다음 레벨로 진행합니다.
+        stageLevel++; // 여기서 스테이지 레벨 증가
+        resultMessage += `<br><br>다음 스테이지 (${stageLevel}/${areaInfo.levels}) 로 이동합니다.`;
+        gameState = 'EXPLORING';
+    }
+    
+    updatePlayerStatsUI();
+    updateMainUI(currentStageData.name, resultMessage, "탐험하기");
+    setUIForAction(true, true); 
+}
+
+function loseGame() {
+    gameState = 'GAME_OVER';
+    updatePlayerStatsUI();
+    updateMainUI("게임 오버", "사망했습니다...", "다시 시작하기");
+    setUIForAction(true, true); 
+}
+
+function winGame() {
+    gameState = 'GAME_OVER'; 
+    updatePlayerStatsUI();
+    updateMainUI("★ GAME CLEAR ★", "모든 스테이지를 클리어했습니다!", "다시 시작하기");
+    setUIForAction(true, false); 
+}
+
+// ==========================================
+// 5. 인벤토리 및 아이템 사용
+// ==========================================
+function displayInventory() {
+    gameState = 'INVENTORY';
+    titleEl.textContent = '인벤토리';
+    resultEl.innerHTML = ''; 
+    resultEl.style.textAlign = 'left'; 
+    setUIForAction(false, false); 
+    const inventoryCounts = {};
+    for (const itemId of player.inventory) {
+        inventoryCounts[itemId] = (inventoryCounts[itemId] || 0) + 1;
+    }
+    if (player.inventory.length === 0) {
+        resultEl.textContent = '가진 아이템이 없습니다.';
+    }
+    for (const itemId in inventoryCounts) {
+        const item = findDataById(ALL_ITEMS, itemId);
+        if (item && item.type === 'consumable') {
+            const itemButton = document.createElement('button');
+            itemButton.textContent = `사용: ${item.name} (x${inventoryCounts[itemId]}) - ${item.description}`;
+            itemButton.onclick = () => useItem(item); 
+            resultEl.appendChild(itemButton);
+        }
+    }
+    const exitButton = document.createElement('button');
+    exitButton.textContent = '탐험으로 돌아가기';
+    exitButton.className = 'exit-button';
+    exitButton.onclick = () => exitInventory(); 
+    resultEl.appendChild(exitButton);
+}
+
+function exitInventory() {
+    if (player.hp <= 0) {
+        loseGame(); 
+    } else {
+        gameState = 'EXPLORING';
+        updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
+        setUIForAction(true, true); 
+    }
+}
+
+function useItem(itemToUse) {
+    const itemIndex = player.inventory.indexOf(itemToUse.id);
+    if (itemIndex === -1) { alert("오류: 해당 아이템이 없습니다."); displayInventory(); return; }
+    player.inventory.splice(itemIndex, 1); 
+    const effect = itemToUse.effect;
+    let value = 0;
+    if (effect.valueDrops) {
+        const drop = getWeightedRandom(effect.valueDrops);
+        value = drop.amount;
+    } 
+    else if (effect.value) { 
+        value = getRandomInt(effect.value.minValue, effect.value.maxValue);
+    }
+    let changeValue = 0;
+    if (effect.direction === "POSITIVE") {
+        changeValue = value;
+    } else if (effect.direction === "NEGATIVE") {
+        changeValue = -value;
+    } else if (effect.direction === "RANDOM") {
+        changeValue = (Math.random() < 0.5) ? value : -value;
+    }
+    let effectMessage = "";
+    if (effect.stat === "hp") {
+        player.hp += changeValue;
+        if (player.hp > player.maxHp) player.hp = player.maxHp; 
+        effectMessage = `HP가 ${changeValue}만큼 회복되었습니다. (현재 HP: ${player.hp})`;
+    } 
+    else if (effect.stat === "str") {
+        player.attack += changeValue;
+        effectMessage = `공격력(ATK)이 ${changeValue}만큼 변동했습니다. (현재 ATK: ${player.attack})`;
+    }
+    alert(effectMessage);
+    updatePlayerStatsUI(); 
+    displayInventory(); 
+}
+
+// ==========================================
+// 6. 상점 기능
+// ==========================================
+function displayShopUI() {
+    titleEl.textContent = currentEvent.name; 
+    resultEl.innerHTML = ''; 
+    resultEl.style.textAlign = 'left'; 
+    setUIForAction(false, false); 
+    generateShopInventory(currentEvent); 
+    for (const item of currentEvent.inventory) {
+        const itemButton = document.createElement('button');
+        itemButton.textContent = `구매: ${item.name} (${item.price} Gold) - ${item.description}`;
+        itemButton.onclick = () => buyItem(item); 
+        resultEl.appendChild(itemButton);
+    }
+    const exitButton = document.createElement('button');
+    exitButton.textContent = '가게 나가기';
+    exitButton.className = 'exit-button'; 
+    exitButton.onclick = () => exitShop(); 
+    resultEl.appendChild(exitButton);
+}
+
+function exitShop() {
+    gameState = 'EXPLORING';
+    currentEvent = null;
+    
+    // ⭐ 상점 스테이지(id가 'shop'인 경우)에서 나갈 때만 다음 지역으로 이동 ⭐
+    if (currentAreaID === 'shop') { 
+        advanceStage(); // 다음 지역으로 이동
+    } else {
+        // 상인이벤트(mystery_merchant) 등 다른 이벤트에서 나가는 경우
+        updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
+        setUIForAction(true, true); 
+    }
+}
+
+function buyItem(itemToBuy) {
+    if (player.gold >= itemToBuy.price) {
+        player.gold -= itemToBuy.price;
+        player.inventory.push(itemToBuy.id);
+        updatePlayerStatsUI(); 
+        alert(`${itemToBuy.name}을(를) 구매했습니다.`);
+    } else {
+        alert('골드가 부족합니다.');
+    }
+}
+
+function generateShopInventory(eventData) {
+    currentEvent.inventory = []; 
+    let itemIDList = [];
+    if (eventData.id === 'shop') {
+        itemIDList = eventData.itemIds;
+    } else if (eventData.id === 'mystery_merchant') {
+        itemIDList = eventData.itemIds.map(item => item.itemID); 
+    }
+    for (const id of itemIDList) {
+        const itemData = findDataById(ALL_ITEMS, id);
+        if (itemData) {
+            const price = getRandomInt(itemData.priceRange.minPrice, itemData.priceRange.maxPrice);
+            currentEvent.inventory.push({ ...itemData, price: price });
+        }
+    }
+}
   </script>
   </body>
 </html>
-
-
