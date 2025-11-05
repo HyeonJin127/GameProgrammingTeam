@@ -1,14 +1,13 @@
-// (참고) 이 로직은 'game_v4_with_intro.html' 파일에서 사용됩니다.
 // HTML 인트로 애니메이션이 끝난 후,
 // 'loadMainGameUI()' 함수가 'initializeDOMElements()'와 'startGame()'을
 // 수동으로 호출하여 게임을 시작합니다.
 
 // ==========================================
-// 1. 게임 데이터 (v3)
+// 1. 게임 데이터 (index (4).html)
 // ==========================================
 const ALL_EVENTS = [
     { id: "mystery_merchant", name: "수상한 상인", itemIds: [{ itemID: "medium_potion", weight: 70 }, { itemID: "large_potion", weight: 20 }, { itemID: "str_potion", weight: 10 }] },
-    { id: "shop", name: "상점", itemIds: ["small_potion", "medium_potion", "large_potion"] },
+    { id: "shop", name: "상점", itemIds: [ "small_potion", "medium_potion", "large_potion", "str_potion" ] },
     { id: "example", name: "예시", baseStats: { baseHp: 100, baseAttack: 100, baseDefense: 100, }, reward: { goldRange: { min: 1, max: 1000 }, itemIds: [{ itemID: "small_potion", weight: 40 }, { itemID: "medium_potion", weight: 25 }, { itemID: "large_potion", weight: 10 }, { itemID: "str_potion", weight: 25 }] } },
     { id: "spider", name: "거미", baseStats: { baseHp: 10, baseAttack: 2, baseDefense: 4, }, reward: { goldRange: { min: 1, max: 5 }, itemIds: [{ itemID: "small_potion", weight: 45 }, { itemID: "str_potion", weight: 5 }, { itemID: null, weigth: 50 }] } },
     { id: "wolf", name: "늑대", baseStats: { baseHp: 10, baseAttack: 4, baseDefense: 2, }, reward: { goldRange: { min: 1, max: 5 }, itemIds: [{ itemID: "small_potion", weight: 45 }, { itemID: "str_potion", weight: 5 }, { itemID: null, weigth: 50 }] } },
@@ -19,9 +18,10 @@ const ALL_EVENTS = [
 ];
 const ALL_STAGES = [
     { id: "forest_enter", name: "숲 초입부", description: "", randomEvent: [{ eventID: "mystery_merchant", weight: 10 }, { eventID: "spider", weight: 45 }, { eventID: "wolf", weight: 45 },], nextStages: ["forest_enter", "forest_ center"], },
-    { id: "forest_center", name: "숲의 중심", description: "왠지 위험한 기분이 든다", randomEvent: [{ eventID: "bear", weight: 50 }, { eventID: "head_wolf", weight: 50 },], nextStages: ["forest_enter", "cave_ enter"], },
+    { id: "forest_center", name: "숲의 중심", description: "왠지 위험한 기분이 든다", randomEvent: [{ eventID: "bear", weight: 50 }, { eventID: "head_wolf", weight: 50 },], nextStages: ["forest_enter", "cave_ enter", "shop"], },
     { id: "cave_enter", name: "동굴 입구", description: "", randomEvent: [{ eventID: "mystery_merchant", weight: 10 }, { eventID: "goblin", weight: 90 },], nextStages: ["cave_enter", "cave_center"], },
-    { id: "cave_deep", name: "동굴 깊은 곳", description: "", randomEvent: [{ eventID: "ork", weight: 100 },], nextStages: ["forest_enter", "cave_ center"], },
+    { id: "cave_deep", name: "동굴 깊은 곳", description: "", randomEvent: [{ eventID: "ork", weight: 100 },], nextStages: ["forest_enter", "cave_ center", "shop"], },
+    { id: "shop", name: "상점", description: "", randomEvent: [{ eventID: "shop", weight: 100 },], nextStages: ["forest_enter", "cave_enter"], },
 ];
 const ALL_ITEMS = [
     { id: "small_potion", name: "소형 물약", description: "5 ~ 10 범위내 hp만큼 회복됩니다.", type: "consumable", priceRange: { minPrice: 5, maxPrice: 10, }, effect: { stat: "hp", value: { minValue: 5, maxValue: 10 }, direction: "POSITIVE" }, },
@@ -41,11 +41,13 @@ let currentEvent;
 let gameState; 
 let titleEl, statsEl, resultEl, buttonEl, inventoryButtonEl;
 
+// (v5) 상점 로직을 위해 STAGE_PROGRESSION_MAP 수정
 const STAGE_PROGRESSION_MAP = {
-    'forest_enter': { nextArea: 'forest_center', levels: 4 }, // 1~4 스테이지
-    'forest_center': { nextArea: 'cave_enter', levels: 1 },    // 5 스테이지 (보스)
+    'forest_enter': { nextArea: 'forest_center', levels: 4 }, 
+    'forest_center': { nextArea: 'shop', levels: 1 },    // 보스 -> 상점
     'cave_enter': { nextArea: 'cave_deep', levels: 4 },
-    'cave_deep': { nextArea: 'GAME_CLEAR', levels: 1 }
+    'cave_deep': { nextArea: 'shop', levels: 1 },     // 보스 -> 상점
+    'shop': { nextArea: '?', levels: 1} // 상점은 특별 처리
 };
 
 function initializeDOMElements() {
@@ -98,8 +100,18 @@ function updatePlayerStatsUI() {
             return `${item.name} x${inventoryCounts[id]}`;
         }).join(', ');
     }
-    const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
-    statsEl.innerHTML = `<b>Stage: ${currentStageData.name} (${stageLevel}/${areaInfo.levels})</b><br>
+    
+    let stageText = "??";
+    if(currentAreaID) {
+        const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+        if (areaInfo) {
+            stageText = `${currentStageData.name} (${stageLevel}/${areaInfo.levels})`;
+        } else {
+            stageText = currentStageData.name; // 'shop' 등
+        }
+    }
+
+    statsEl.innerHTML = `<b>Stage: ${stageText}</b><br>
                          HP: ${player.hp} / ${player.maxHp} | ATK: ${player.attack} | DEF: ${player.defense} | Gold: ${player.gold}<br>
                          인벤토리: ${inventoryText}`;
 }
@@ -119,11 +131,12 @@ function setUIForAction(showMain = false, showInventory = false) {
 }
 
 // ==========================================
-// 4. 게임 플레이 함수
+// 4. 게임 플레이 함수 (v5)
 // ==========================================
 function startGame() {
     player = {
-        hp: 100, maxHp: 100, attack: 10, defense: 5, gold: 0, inventory: [] 
+        hp: 100, maxHp: 100, attack: 10, defense: 5, gold: 0, inventory: [],
+        nextAreaAfterShop: null // (v5) 상점 후 이동할 위치
     };
     currentAreaID = 'forest_enter';
     currentStageData = findDataById(ALL_STAGES, currentAreaID);
@@ -156,6 +169,15 @@ function handleInventoryAction() {
 }
 
 function triggerRandomEvent() {
+    // (v5) 'shop' 스테이지는 무조건 'shop' 이벤트만 발생
+    if (currentAreaID === 'shop') {
+        const shopEventData = findDataById(ALL_EVENTS, "shop");
+        currentEvent = { ...shopEventData };
+        gameState = 'SHOPPING';
+        displayShopUI();
+        return;
+    }
+
     const eventRoll = getWeightedRandom(currentStageData.randomEvent); 
     const eventData = findDataById(ALL_EVENTS, eventRoll.eventID);
     if (!eventData) {
@@ -208,6 +230,7 @@ function attackMonster() {
     }
 }
 
+// (v5) 보스 클리어 후 상점 이동 로직
 function winCombat() {
     const reward = currentEvent.reward;
     let gainedGold = 0;
@@ -233,8 +256,40 @@ function winCombat() {
     currentEvent = null; 
     stageLevel++;
     const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+    
     if (stageLevel > areaInfo.levels) {
+        // 다음 지역으로 이동
         const nextAreaID = areaInfo.nextArea;
+
+        // (v5) 보스 스테이지였는지 확인 (MAP 기준)
+        const isBossStage = (currentAreaID === 'forest_center' || currentAreaID === 'cave_deep');
+
+        if (isBossStage) {
+            // 보스 클리어! 상점으로 강제 이동
+            gameState = 'SHOPPING';
+            
+            // (v5) 상점 방문 후 가야할 곳을 플레이어 객체에 임시 저장
+            if (currentAreaID === 'forest_center') {
+                player.nextAreaAfterShop = 'cave_enter'; 
+            } else if (currentAreaID === 'cave_deep') {
+                player.nextAreaAfterShop = 'GAME_CLEAR';
+            }
+            
+            // 상점 이벤트 데이터 수동 로드
+            currentAreaID = 'shop'; // (v5) 현재 위치를 상점으로 변경
+            currentStageData = findDataById(ALL_STAGES, currentAreaID);
+            stageLevel = 1;
+            
+            const shopEventData = findDataById(ALL_EVENTS, "shop");
+            currentEvent = { ...shopEventData };
+            displayShopUI(); // 상점 UI 표시
+            
+            updatePlayerStatsUI(); 
+            titleEl.textContent = "보스 처치! 상점을 발견했다!"; // 제목 변경
+            return; // 함수 종료 (상점 UI가 표시됨)
+        }
+
+        // (보스가 아닐 경우) 다음 지역으로 즉시 이동
         if (nextAreaID === 'GAME_CLEAR') {
             winGame();
             return;
@@ -244,6 +299,7 @@ function winCombat() {
         stageLevel = 1;
         resultMessage += `<br><br><b>다음 지역 [${currentStageData.name}] (으)로 이동합니다!</b>`;
     } else {
+        // 현재 지역 탐험 계속
         resultMessage += `<br><br>다음 스테이지 (${stageLevel}/${areaInfo.levels}) 로 이동합니다.`;
     }
     updatePlayerStatsUI();
@@ -253,6 +309,7 @@ function winCombat() {
 
 function loseGame() {
     gameState = 'GAME_OVER';
+    player.nextAreaAfterShop = null; // (v5) 플래그 초기화
     updatePlayerStatsUI();
     updateMainUI("게임 오버", "사망했습니다...", "다시 시작하기");
     setUIForAction(true, true); 
@@ -260,13 +317,14 @@ function loseGame() {
 
 function winGame() {
     gameState = 'GAME_OVER'; 
+    player.nextAreaAfterShop = null; // (v5) 플래그 초기화
     updatePlayerStatsUI();
     updateMainUI("★ GAME CLEAR ★", "모든 스테이지를 클리어했습니다!", "다시 시작하기");
     setUIForAction(true, false); 
 }
 
 // ==========================================
-// 5. 인벤토리 및 아이템 사용
+// 5. 인벤토리 및 아이템 사용 (v4)
 // ==========================================
 function displayInventory() {
     gameState = 'INVENTORY';
@@ -274,6 +332,10 @@ function displayInventory() {
     resultEl.innerHTML = ''; 
     resultEl.style.textAlign = 'left'; 
     setUIForAction(false, false); 
+    
+    // (v5) 상점에서도 인벤토리를 열 수 있도록 함
+    if (inventoryButtonEl) inventoryButtonEl.style.display = 'block';
+
     const inventoryCounts = {};
     for (const itemId of player.inventory) {
         inventoryCounts[itemId] = (inventoryCounts[itemId] || 0) + 1;
@@ -291,7 +353,7 @@ function displayInventory() {
         }
     }
     const exitButton = document.createElement('button');
-    exitButton.textContent = '탐험으로 돌아가기';
+    exitButton.textContent = '돌아가기'; // (v5) '상점'일 수도 있으므로
     exitButton.className = 'exit-button';
     exitButton.onclick = () => exitInventory(); 
     resultEl.appendChild(exitButton);
@@ -301,9 +363,17 @@ function exitInventory() {
     if (player.hp <= 0) {
         loseGame(); 
     } else {
-        gameState = 'EXPLORING';
-        updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
-        setUIForAction(true, true); 
+        // (v5) 상점에서 인벤토리를 열었는지 확인
+        if (currentAreaID === 'shop') {
+            gameState = 'SHOPPING';
+            displayShopUI();
+        } 
+        // (v5) 일반 탐험 중이었는지 확인
+        else {
+            gameState = 'EXPLORING';
+            updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
+            setUIForAction(true, true); 
+        }
     }
 }
 
@@ -344,13 +414,17 @@ function useItem(itemToUse) {
 }
 
 // ==========================================
-// 6. 상점 기능
+// 6. 상점 기능 (v5)
 // ==========================================
 function displayShopUI() {
     titleEl.textContent = currentEvent.name; 
     resultEl.innerHTML = ''; 
     resultEl.style.textAlign = 'left'; 
     setUIForAction(false, false); 
+    
+    // (v5) 상점 내에서 인벤토리 버튼 활성화
+    if(inventoryButtonEl) inventoryButtonEl.style.display = 'block';
+
     generateShopInventory(currentEvent); 
     for (const item of currentEvent.inventory) {
         const itemButton = document.createElement('button');
@@ -365,11 +439,35 @@ function displayShopUI() {
     resultEl.appendChild(exitButton);
 }
 
+// (v5) 상점 나가기 로직 수정
 function exitShop() {
     gameState = 'EXPLORING';
     currentEvent = null;
-    updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
-    setUIForAction(true, true); 
+
+    // (v5) 보스 클리어 직후 상점이었는지 확인
+    if (player.nextAreaAfterShop) {
+        const nextAreaID = player.nextAreaAfterShop;
+        player.nextAreaAfterShop = null; // 플래그 초기화
+
+        if (nextAreaID === 'GAME_CLEAR') {
+            winGame();
+            return;
+        }
+        
+        // 다음 지역으로 이동
+        currentAreaID = nextAreaID;
+        currentStageData = findDataById(ALL_STAGES, currentAreaID);
+        stageLevel = 1;
+        
+        updatePlayerStatsUI();
+        updateMainUI(currentStageData.name, `상점을 나와 [${currentStageData.name}](으)로 이동합니다.`, "탐험하기");
+        setUIForAction(true, true);
+
+    } else {
+        // (v5) 일반 탐험 중 만난 상점
+        updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
+        setUIForAction(true, true); 
+    }
 }
 
 function buyItem(itemToBuy) {
@@ -400,4 +498,3 @@ function generateShopInventory(eventData) {
         }
     }
 }
-
