@@ -204,34 +204,32 @@
 
     // 진입 처리(게이트 오픈 → 다음 화면)
     function openGateAndEnter() {
-    // 로고/인트로가 게이트 애니메이션 동안 보이지 않도록 즉시 숨김
-    veil.classList.remove('on');
-    intro.style.visibility = 'hidden';
-    intro.style.opacity = '0';
+        // 로고/인트로가 게이트 애니메이션 동안 보이지 않도록 즉시 숨김
+        veil.classList.remove('on');
+        intro.style.visibility = 'hidden';
+        intro.style.opacity = '0';
 
-    // 게이트 애니메이션 시작
-    gate.classList.add('open');
+        // 게이트 애니메이션 시작
+        gate.classList.add('open');
 
-    // 애니메이션 완료 후 메인 UI 표시 및 게임 시작
-    setTimeout(()=>{
-        // 1. 인트로 관련 요소를 DOM에서 완전히 제거하거나 숨기기
-        //   -> 인트로 컨테이너를 display: none; 처리하여 공간을 차지하지 않도록 합니다.
-        intro.style.display = 'none'; // ⭐ 이 부분이 핵심입니다! ⭐
-        
-        // 2. 메인 UI 요소 초기화 (DOM에 추가되었으므로)
-        initializeDOMElements(); 
-        
-        // 3. 메인 게임 컨테이너를 보이게 설정 (이전에 추가하신 HTML 구조)
-        gameContainerEl.style.display = 'block';
-        
-        // 4. 메인 액션 버튼 이벤트 리스너 연결 (추가된 기능)
-        buttonEl.addEventListener('click', handleMainAction);
-        inventoryButtonEl.addEventListener('click', handleInventoryAction);
+        // 애니메이션 완료 후 메인 UI 표시 및 게임 시작
+        setTimeout(()=>{
+            // 1. 인트로 관련 요소를 DOM에서 완전히 제거하거나 숨기기
+            //   -> 인트로 컨테이너를 display: none; 처리하여 공간을 차지하지 않도록 합니다.
+            intro.style.display = 'none'; // ⭐ 이 부분이 핵심입니다! ⭐
+            
+            // 2. 메인 UI 요소 초기화 (DOM에 추가되었으므로)
+            initializeDOMElements(); 
+            
+            // 3. 메인 게임 컨테이너를 보이게 설정 (이전에 추가하신 HTML 구조)
+            gameContainerEl.style.display = 'block';
+            
+            startGame();
 
-        // 5. 게임 시작 함수 호출
-        startGame();
-    }, 720); // 게이트 애니메이션 시간 (720ms)과 일치
-}
+            // 5. 게임 시작 함수 호출
+            startGame();
+        }, 720); // 게이트 애니메이션 시간 (720ms)과 일치
+    }
     
     async function tryEnter(){ if(!ready) return; await AudioMgr.resume(); AudioMgr.beep(1200,.12); openGateAndEnter(); }
     veil.addEventListener('click', tryEnter);
@@ -619,6 +617,12 @@ let currentEvent;
 let gameState; 
 let titleEl, statsEl, resultEl, buttonEl, inventoryButtonEl, gameContainerEl;
 
+let tempCombatBonus = { attack: 0, defense: 0 };
+
+let isATKDiceRolled = false;
+let isDEFDiceRolled = false;
+let diceRollResultLog = ""; // 주사위 굴림 결과를 누적하여 보여줄 로그
+
 const STAGE_PROGRESSION_MAP = {
     'forest_enter': { nextArea: 'forest_center', levels: 4 }, // 1~4 스테이지
     'forest_center': { nextArea: 'shop', levels: 1 },    // 5 스테이지 (보스)
@@ -680,9 +684,13 @@ function updatePlayerStatsUI() {
             return `${item.name} x${inventoryCounts[id]}`;
         }).join(', ');
     }
+
+    const atkBonusText = tempCombatBonus.attack !== 0 ? `(<span style="color:${tempCombatBonus.attack > 0 ? 'yellowgreen' : 'red'};">${tempCombatBonus.attack > 0 ? '+' : ''}${tempCombatBonus.attack}</span>)` : '';
+    const defBonusText = tempCombatBonus.defense !== 0 ? `(<span style="color:${tempCombatBonus.defense > 0 ? 'yellowgreen' : 'red'};">${tempCombatBonus.defense > 0 ? '+' : ''}${tempCombatBonus.defense}</span>)` : '';
+
     const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
     statsEl.innerHTML = `<b>Stage: ${currentStageData.name} (${stageLevel}/${areaInfo.levels})</b><br>
-                         HP: ${player.hp} / ${player.maxHp} | ATK: ${player.attack} | DEF: ${player.defense} | Gold: ${player.gold}<br>
+                         HP: ${player.hp} / ${player.maxHp} | ATK: ${player.attack}${atkBonusText} | DEF: ${player.defense}${defBonusText} | Gold: ${player.gold}<br>
                          인벤토리: ${inventoryText}`;
 }
 
@@ -709,6 +717,7 @@ function startGame() {
     };
     currentAreaID = 'forest_enter';
     currentStageData = findDataById(ALL_STAGES, currentAreaID);
+    setMainActionListeners();
     stageLevel = 1;
     gameState = 'EXPLORING';
     updatePlayerStatsUI();
@@ -725,11 +734,19 @@ function handleMainAction() {
         case 'EXPLORING':
             triggerRandomEvent();
             break;
+        // ⭐ 수정: ATK 주사위 굴림 상태 처리 ⭐
+        case 'DICE_ROLL_ATK':
+            rollDiceATK();
+            break;
+        // ⭐ 추가: DEF 주사위 굴림 상태 처리 ⭐
+        case 'DICE_ROLL_DEF':
+            rollDiceDEF();
+            break;
         case 'COMBAT':
             attackMonster();
             break;
         case 'AREA_CLEAR':
-            // 이 케이스는 winCombat에서 버튼 핸들러를 직접 변경하므로 여기서는 처리 안함
+            // ... (기존 로직 유지)
             break;
     }
 }
@@ -749,21 +766,118 @@ function triggerRandomEvent() {
         return;
     }
     if (eventData.baseStats) {
-        gameState = 'COMBAT';
+        gameState = 'DICE_ROLL'; 
+        // 몬스터 정보 초기화 (주사위 굴림 중에는 보너스/패널티를 받지 않으므로 리셋)
+        resetCombatDiceBonus(); 
+        
         currentEvent = {
             ...eventData, 
             currentHp: eventData.baseStats.baseHp,
             attack: eventData.baseStats.baseAttack,
             defense: eventData.baseStats.baseDefense
         };
-        updateMainUI(`몬스터 출현!`, `${currentEvent.name} (HP: ${currentEvent.currentHp})`, "공격하기");
-        setUIForAction(true, false); 
+        
+        displayDiceRollScreen(); // ATK 주사위 굴림 화면 표시
     } 
     else if (eventData.id === "mystery_merchant" || eventData.id === "shop") {
         gameState = 'SHOPPING';
         currentEvent = { ...eventData };
         displayShopUI(); 
     }
+}
+
+function applyCombatDiceBonus(statType) {
+    const diceRoll = getRandomInt(1, 6);
+    let bonus = 0;
+    const statName = statType === 'attack' ? '공격력(ATK)' : '방어력(DEF)';
+    let message = `주사위 굴림 결과: 🎲 <b>${diceRoll}</b>!`;
+
+    if (diceRoll === 6) {
+        bonus = 3;
+        message += `<br>🔥 <b>대성공!</b> ${statName} +3 보너스!`;
+    } else if (diceRoll >= 4) {
+        bonus = 2;
+        message += `<br>👍 <b>성공!</b> ${statName} +2 보너스!`;
+    } else if (diceRoll === 1) {
+        bonus = -1;
+        message += `<br>💀 <b>실패...</b> ${statName} -1 패널티...`;
+    } else {
+        message += `<br>평범한 굴림입니다.`;
+    }
+
+    tempCombatBonus[statType] = bonus;
+    return message;
+}
+
+function resetCombatDiceBonus() {
+    // ... (기존 로직 유지)
+}
+
+function resetCombatDiceBonus() {
+    // 플레이어 스탯에서 임시 보너스 제거
+    player.attack -= tempCombatBonus.attack;
+    player.defense -= tempCombatBonus.defense;
+
+    // 임시 보너스 초기화
+    tempCombatBonus.attack = 0;
+    tempCombatBonus.defense = 0;
+}
+
+function displayDiceRollScreen(statType) {
+    // 몬스터 정보는 이미 currentEvent에 저장되어 있음
+    const statName = statType === 'attack' ? '공격력(ATK)' : '방어력(DEF)';
+    
+    updatePlayerStatsUI();
+    updateMainUI(`몬스터 출현!`, 
+                 `${currentEvent.name}이(가) 나타났다! 전투에 돌입하기 전, **${statName}** 보너스를 위해 주사위를 굴립니다.`, 
+                 `${statName} 주사위 굴리기`);
+    setUIForAction(true, false); 
+}
+
+function rollDiceATK() {
+    // 1. ATK 주사위 굴림 로직 실행 및 결과 메시지 획득
+    const diceMessage = applyCombatDiceBonus('attack');
+
+    // 2. 주사위 결과 화면 표시
+    updateMainUI(`공격력 주사위 결과!`, 
+                 `${diceMessage}<br><br><b>방어력 주사위를 굴릴 준비를 하세요.</b>`, 
+                 "방어력 주사위 굴리기");
+    
+    // 3. 다음 상태로 전환
+    gameState = 'DICE_ROLL_DEF'; 
+}
+
+function rollDiceDEF() {
+    // 1. DEF 주사위 굴림 로직 실행 및 결과 메시지 획득
+    const diceMessage = applyCombatDiceBonus('defense');
+
+    // 2. 최종 스탯 적용
+    player.attack += tempCombatBonus.attack;
+    player.defense += tempCombatBonus.defense;
+
+    // 3. 전투 시작 화면으로 전환
+    gameState = 'COMBAT'; 
+    
+    updatePlayerStatsUI(); // 최종 스탯 반영
+    updateMainUI(`전투 시작!`, 
+                 `${diceMessage}<br><br><b>${currentEvent.name}</b> (HP: ${currentEvent.currentHp})과의 전투를 시작합니다!`, 
+                 "공격하기");
+    setUIForAction(true, false);
+}
+
+function rollDiceAndStartCombat() {
+    // 1. 주사위 보너스 적용 및 메시지 획득
+    const diceMessage = applyCombatDiceBonus();
+
+    // 2. 게임 상태를 전투로 변경
+    gameState = 'COMBAT';
+    
+    // 3. UI 업데이트
+    updatePlayerStatsUI(); // 보너스 스탯이 반영된 스탯창 업데이트
+    updateMainUI(`전투 시작!`, 
+                 `${diceMessage}<br><br>${currentEvent.name} (HP: ${currentEvent.currentHp})`, 
+                 "공격하기");
+    setUIForAction(true, false); // 공격하기 버튼으로 전환
 }
 
 function attackMonster() {
@@ -838,6 +952,8 @@ function winCombat() {
             resultMessage += `<br>(아이템 없음)`;
         }
     }
+
+    resetCombatDiceBonus();
     
     currentEvent = null; 
     
@@ -879,6 +995,8 @@ function winCombat() {
 }
 
 function loseGame() {
+    resetCombatDiceBonus();
+
     gameState = 'GAME_OVER';
     updatePlayerStatsUI();
     updateMainUI("게임 오버", "사망했습니다...", "다시 시작하기");
@@ -890,6 +1008,109 @@ function winGame() {
     updatePlayerStatsUI();
     updateMainUI("★ GAME CLEAR ★", "모든 스테이지를 클리어했습니다!", "다시 시작하기");
     setUIForAction(true, false); 
+}
+
+function setMainActionListeners() {
+    // 일반 상태: 메인 버튼 = handleMainAction, 인벤토리 버튼 = handleInventoryAction
+    buttonEl.onclick = handleMainAction;
+    inventoryButtonEl.onclick = handleInventoryAction;
+}
+
+function clearMainActionListeners() {
+    // 리스너 제거
+    buttonEl.onclick = null;
+    inventoryButtonEl.onclick = null;
+}
+
+function setDiceRollListeners() {
+    // 주사위 굴림 상태: 메인 버튼 = ATK 굴림, 인벤토리 버튼 = DEF 굴림
+    clearMainActionListeners();
+    buttonEl.onclick = handleATKDiceRoll;
+    inventoryButtonEl.onclick = handleDEFDiceRoll;
+}
+
+// [4. 게임 플레이 함수] 섹션에 새로 추가
+
+function displayDiceRollScreen() {
+    // 상태 초기화
+    isATKDiceRolled = false;
+    isDEFDiceRolled = false;
+    diceRollResultLog = "";
+    
+    // 버튼 리스너 설정
+    setDiceRollListeners();
+
+    // UI 업데이트
+    updatePlayerStatsUI();
+    updateMainUI(`몬스터 출현!`, 
+                 `${currentEvent.name}이(가) 나타났다! 전투에 돌입하기 전, 공격력과 방어력 주사위를 굴립니다.`, 
+                 "공격력 주사위 굴리기");
+    
+    // 인벤토리 버튼을 DEF 주사위 버튼으로 사용
+    inventoryButtonEl.textContent = '방어력 주사위 굴리기';
+    inventoryButtonEl.disabled = false; // 버튼 활성화
+    buttonEl.disabled = false;
+    setUIForAction(true, true); // 두 버튼 모두 표시
+}
+
+function startCombatAfterDiceRoll() {
+    // 1. 최종 스탯 적용
+    player.attack += tempCombatBonus.attack;
+    player.defense += tempCombatBonus.defense;
+
+    // 2. 전투 상태로 전환 및 리스너 복구
+    gameState = 'COMBAT'; 
+    setMainActionListeners(); 
+
+    buttonEl.disabled = false;
+    inventoryButtonEl.disabled = false;
+    inventoryButtonEl.textContent = '인벤토리';
+
+    // 3. UI 업데이트
+    updatePlayerStatsUI(); 
+    updateMainUI(`전투 시작!`, 
+                 `${diceRollResultLog}<br><b>${currentEvent.name}</b> (HP: ${currentEvent.currentHp})과의 전투를 시작합니다!`, 
+                 "공격하기");
+    setUIForAction(true, false); // 인벤토리 버튼 숨김 (원래의 전투 UI)
+}
+
+function handleATKDiceRoll() {
+    if (isATKDiceRolled) return;
+
+    const message = applyCombatDiceBonus('attack');
+
+    isATKDiceRolled = true;
+    diceRollResultLog += `[ATK 굴림]: ${message}<br>`;
+
+    buttonEl.disabled = true;
+    buttonEl.textContent = `공격력 굴림 완료 (+${tempCombatBonus.attack})`;
+
+    resultEl.innerHTML = diceRollResultLog;
+    updatePlayerStatsUI();
+    
+    // 두 주사위 모두 굴렸으면 전투 시작
+    if (isDEFDiceRolled) {
+        startCombatAfterDiceRoll();
+    }
+}
+
+function handleDEFDiceRoll() {
+    if (isDEFDiceRolled) return;
+
+    const message = applyCombatDiceBonus('defense');
+
+    isDEFDiceRolled = true;
+    diceRollResultLog += `[DEF 굴림]: ${message}<br>`;
+
+    inventoryButtonEl.disabled = true;
+    inventoryButtonEl.textContent = `방어력 굴림 완료 (+${tempCombatBonus.defense})`;
+
+    resultEl.innerHTML = diceRollResultLog;
+    updatePlayerStatsUI();
+
+    if (isATKDiceRolled) {
+        startCombatAfterDiceRoll();
+    }
 }
 
 // ==========================================
