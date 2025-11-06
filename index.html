@@ -713,13 +713,21 @@ function setUIForAction(showMain = false, showInventory = false) {
 // ==========================================
 function startGame() {
     player = {
-        hp: 100, maxHp: 100, attack: 10, defense: 5, gold: 0, inventory: [] 
+        hp: 100, 
+        maxHp: 100, 
+        attack: 10, 
+        defense: 5, 
+        gold: 0, 
+        inventory: [] 
     };
+
     currentAreaID = 'forest_enter';
     currentStageData = findDataById(ALL_STAGES, currentAreaID);
     setMainActionListeners();
     stageLevel = 1;
+
     gameState = 'EXPLORING';
+
     updatePlayerStatsUI();
     updateMainUI(currentStageData.name, "무엇을 하시겠습니까?", "탐험하기");
     setUIForAction(true, true); 
@@ -734,11 +742,9 @@ function handleMainAction() {
         case 'EXPLORING':
             triggerRandomEvent();
             break;
-        // ⭐ 수정: ATK 주사위 굴림 상태 처리 ⭐
         case 'DICE_ROLL_ATK':
             rollDiceATK();
             break;
-        // ⭐ 추가: DEF 주사위 굴림 상태 처리 ⭐
         case 'DICE_ROLL_DEF':
             rollDiceDEF();
             break;
@@ -746,7 +752,6 @@ function handleMainAction() {
             attackMonster();
             break;
         case 'AREA_CLEAR':
-            // ... (기존 로직 유지)
             break;
     }
 }
@@ -807,10 +812,6 @@ function applyCombatDiceBonus(statType) {
 
     tempCombatBonus[statType] = bonus;
     return message;
-}
-
-function resetCombatDiceBonus() {
-    // ... (기존 로직 유지)
 }
 
 function resetCombatDiceBonus() {
@@ -882,24 +883,33 @@ function rollDiceAndStartCombat() {
 
 function attackMonster() {
     let logMessage = "";
+
+    // 1. 플레이어 공격
     const playerRawDamage = getRandomInt(player.attack - 2, player.attack + 2);
     const monsterDefense = currentEvent.defense;
-    const playerDamage = Math.max(1, playerRawDamage - monsterDefense); 
+    const playerDamage = Math.max(1, playerRawDamage - monsterDefense); // 최소 1 데미지
+
     currentEvent.currentHp -= playerDamage;
     logMessage += `[플레이어] ${currentEvent.name}에게 ${playerDamage}의 피해! (방어: ${monsterDefense})`;
+
     if (currentEvent.currentHp <= 0) {
         winCombat(); 
         return;
     }
+
+    // 2. 몬스터 공격
     const monsterRawDamage = getRandomInt(currentEvent.attack - 1, currentEvent.attack + 1);
     const playerDefense = player.defense;
     const monsterDamage = Math.max(1, monsterRawDamage - playerDefense); 
+
     player.hp -= monsterDamage;
     logMessage += `<br>[${currentEvent.name}] 플레이어에게 ${monsterDamage}의 피해! (방어: ${playerDefense})`;
+
     if (player.hp <= 0) {
         player.hp = 0;
         loseGame();
     } else {
+        // 전투 지속
         updatePlayerStatsUI();
         updateMainUI('전투 중!', `${currentEvent.name} (HP: ${currentEvent.currentHp})`, "공격하기");
         resultEl.innerHTML = logMessage;
@@ -932,7 +942,9 @@ function advanceStage() {
 }
 
 function winCombat() {
+    // 보상 획득 로직
     const reward = currentEvent.reward;
+
     let gainedGold = 0;
     let resultMessage = `${currentEvent.name} 처치!`;
     if (reward.goldRange) {
@@ -940,6 +952,7 @@ function winCombat() {
         player.gold += gainedGold;
         resultMessage += `<br>(+${gainedGold} Gold)`;
     }
+
     if (reward.itemIds && reward.itemIds.length > 0) {
         const droppedItemInfo = getWeightedRandom(reward.itemIds); 
         if (droppedItemInfo && droppedItemInfo.itemID) {

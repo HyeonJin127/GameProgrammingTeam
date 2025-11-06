@@ -599,44 +599,53 @@ document.addEventListener('DOMContentLoaded', (event) \=\> {
 
 // 플레이어 스탯(ATK, DEF) 및 스테이지 초기화  
 ~~~js
-function startGame() {  
-    player \= {  
-        hp: 100,  
-        maxHp: 100,  
-        attack: 10,  
-        defense: 5,  
-        gold: 0,  
-        inventory: \[\]   
-    };  
-      
-    currentAreaID \= 'forest\_enter';  
-    currentStageData \= findDataById(ALL\_STAGES, currentAreaID);  
-    stageLevel \= 1;
+function startGame() {
+    player = {
+        hp: 100, 
+        maxHp: 100, 
+        attack: 10, 
+        defense: 5, 
+        gold: 0, 
+        inventory: [] 
+    };
 
-    gameState \= 'EXPLORING';
+    currentAreaID = 'forest_enter';
+    currentStageData = findDataById(ALL_STAGES, currentAreaID);
+    setMainActionListeners();
+    stageLevel = 1;
 
-    updatePlayerStatsUI();  
-    updateMainUI(currentStageData.name, "무엇을 하시겠습니까?", "탐험하기");  
-    setUIForAction(true, true);   
+    gameState = 'EXPLORING';
+
+    updatePlayerStatsUI();
+    updateMainUI(currentStageData.name, "무엇을 하시겠습니까?", "탐험하기");
+    setUIForAction(true, true); 
 }
 ~~~
 #### **handleMainAction() (메인 버튼)**
 
 gameState에 따라 '탐험', '공격', '재시작' 등 각기 다른 함수를 호출하는 메인 컨트롤러입니다.
 ~~~js
-function handleMainAction() {  
-    switch (gameState) {  
-        case 'START':  
-        case 'GAME\_OVER':  
-            startGame();  
-            break;  
-        case 'EXPLORING':  
-            triggerRandomEvent();  
-            break;  
-        case 'COMBAT':  
-            attackMonster();  
-            break;  
-    }  
+function handleMainAction() {
+    switch (gameState) {
+        case 'START':
+        case 'GAME_OVER':
+            startGame();
+            break;
+        case 'EXPLORING':
+            triggerRandomEvent();
+            break;
+        case 'DICE_ROLL_ATK':
+            rollDiceATK();
+            break;
+        case 'DICE_ROLL_DEF':
+            rollDiceDEF();
+            break;
+        case 'COMBAT':
+            attackMonster();
+            break;
+        case 'AREA_CLEAR':
+            break;
+    }
 }
 ~~~
 #### **handleInventoryAction() (인벤토리 버튼)**
@@ -658,35 +667,35 @@ function handleInventoryAction() {
 * baseStats 속성이 있으면 몬스터로 간주, gameState를 COMBAT으로 변경.  
 * 아니면 상점으로 간주, gameState를 SHOPPING으로 변경.
 
-// 몬스터 만날 시 baseStats \-\> currentHp 등으로 복사  
+// 몬스터 만날 시 보너스 스탯 획득 화면 이동 및 baseStats \-\> currentHp 등으로 복사  
 ~~~js
-function triggerRandomEvent() {  
-    const eventRoll \= getWeightedRandom(currentStageData.randomEvent);   
-    const eventData \= findDataById(ALL\_EVENTS, eventRoll.eventID);  
-      
-    // ... (오류 처리) ...
-
-    // 몬스터(baseStats)인지 상점인지 확인  
-    if (eventData.baseStats) {  
-        // 몬스터  
-        gameState \= 'COMBAT';  
-        // 몬스터 생성: baseStats를 현재 스탯으로 복사  
-        currentEvent \= {  
-            ...eventData, // name, reward 등 복사  
-            currentHp: eventData.baseStats.baseHp,  
-            attack: eventData.baseStats.baseAttack,  
-            defense: eventData.baseStats.baseDefense  
-        };  
-        updateMainUI(\`몬스터 출현\!\`, \`${currentEvent.name} (HP: ${currentEvent.currentHp})\`, "공격하기");  
-        setUIForAction(true, false);   
-    }   
-    else if (eventData.id \=== "mystery\_merchant" || eventData.id \=== "shop") {  
-        // 상점  
-        gameState \= 'SHOPPING';  
-        currentEvent \= { ...eventData }; // 상점은 단순 복사  
-        generateShopInventory(eventData);   
-        displayShopUI();   
-    }  
+function triggerRandomEvent() {
+    const eventRoll = getWeightedRandom(currentStageData.randomEvent); 
+    const eventData = findDataById(ALL_EVENTS, eventRoll.eventID);
+    if (!eventData) {
+        console.error(`이벤트 데이터를 찾을 수 없습니다: ${eventRoll.eventID}`);
+        updateMainUI(currentStageData.name, "아무것도 발견하지 못했다.", "탐험하기");
+        return;
+    }
+    if (eventData.baseStats) {
+        gameState = 'DICE_ROLL'; 
+        // 몬스터 정보 초기화 (주사위 굴림 중에는 보너스/패널티를 받지 않으므로 리셋)
+        resetCombatDiceBonus(); 
+        
+        currentEvent = {
+            ...eventData, 
+            currentHp: eventData.baseStats.baseHp,
+            attack: eventData.baseStats.baseAttack,
+            defense: eventData.baseStats.baseDefense
+        };
+        
+        displayDiceRollScreen(); // ATK 주사위 굴림 화면 표시
+    } 
+    else if (eventData.id === "mystery_merchant" || eventData.id === "shop") {
+        gameState = 'SHOPPING';
+        currentEvent = { ...eventData };
+        displayShopUI(); 
+    }
 }
 ~~~
 #### **attackMonster()**
@@ -695,40 +704,40 @@ function triggerRandomEvent() {
 
 // (공격력 \- 방어력) 전투 공식 적용  
 ~~~js
-function attackMonster() {  
-    let logMessage \= "";
+function attackMonster() {
+    let logMessage = "";
 
-    // 1\. 플레이어 공격  
-    const playerRawDamage \= getRandomInt(player.attack \- 2, player.attack \+ 2);  
-    const monsterDefense \= currentEvent.defense;  
-    const playerDamage \= Math.max(1, playerRawDamage \- monsterDefense); // 최소 1 데미지  
-      
-    currentEvent.currentHp \-= playerDamage;  
-    logMessage \+= \`\[플레이어\] ${currentEvent.name}에게 ${playerDamage}의 피해\! (방어: ${monsterDefense})\`;
+    // 1. 플레이어 공격
+    const playerRawDamage = getRandomInt(player.attack - 2, player.attack + 2);
+    const monsterDefense = currentEvent.defense;
+    const playerDamage = Math.max(1, playerRawDamage - monsterDefense); // 최소 1 데미지
 
-    if (currentEvent.currentHp \<= 0\) {  
-        winCombat();   
-        return;  
+    currentEvent.currentHp -= playerDamage;
+    logMessage += `[플레이어] ${currentEvent.name}에게 ${playerDamage}의 피해! (방어: ${monsterDefense})`;
+
+    if (currentEvent.currentHp <= 0) {
+        winCombat(); 
+        return;
     }
 
-    // 2\. 몬스터 공격  
-    const monsterRawDamage \= getRandomInt(currentEvent.attack \- 1, currentEvent.attack \+ 1);  
-    const playerDefense \= player.defense;  
-    const monsterDamage \= Math.max(1, monsterRawDamage \- playerDefense); // 최소 1 데미지
+    // 2. 몬스터 공격
+    const monsterRawDamage = getRandomInt(currentEvent.attack - 1, currentEvent.attack + 1);
+    const playerDefense = player.defense;
+    const monsterDamage = Math.max(1, monsterRawDamage - playerDefense); 
 
-    player.hp \-= monsterDamage;  
-    logMessage \+= \`\<br\>\[${currentEvent.name}\] 플레이어에게 ${monsterDamage}의 피해\! (방어: ${playerDefense})\`;
+    player.hp -= monsterDamage;
+    logMessage += `<br>[${currentEvent.name}] 플레이어에게 ${monsterDamage}의 피해! (방어: ${playerDefense})`;
 
-    if (player.hp \<= 0\) {  
-        player.hp \= 0;  
-        loseGame();  
-    } else {  
-        // 전투 지속  
-        updatePlayerStatsUI();  
-        updateMainUI('전투 중\!', \`${currentEvent.name} (HP: ${currentEvent.currentHp})\`, "공격하기");  
-        resultEl.innerHTML \= logMessage;  
-        setUIForAction(true, false);   
-    }  
+    if (player.hp <= 0) {
+        player.hp = 0;
+        loseGame();
+    } else {
+        // 전투 지속
+        updatePlayerStatsUI();
+        updateMainUI('전투 중!', `${currentEvent.name} (HP: ${currentEvent.currentHp})`, "공격하기");
+        resultEl.innerHTML = logMessage;
+        setUIForAction(true, false); 
+    }
 }
 ~~~
 #### **winCombat()**
@@ -736,57 +745,77 @@ function attackMonster() {
 전투 승리 시 호출됩니다.
 
 1. 몬스터의 reward (골드, 아이템)를 계산하여 player 객체에 추가합니다. (itemID: null은 "아이템 없음"으로 처리)  
-2. stageLevel을 1 올립니다.  
-3. STAGE\_PROGRESSION\_MAP을 확인하여 stageLevel이 최대치를 넘었으면 다음 지역(nextArea)으로 이동시킵니다.  
-4. 만약 nextArea가 'GAME\_CLEAR'이면 winGame()을 호출합니다.
+2. 스테이지 시작할 때 부여된 보너스 스탯 초기화
+3. stageLevel을 1 올립니다.  
+4. STAGE_PROGRESSION_MAP을 확인하여 stageLevel이 최대치를 넘었으면 다음 지역(nextArea)으로 이동시킵니다.  
+5. 만약 nextArea가 'GAME_CLEAR'이면 winGame()을 호출합니다.
 
 // 스테이지 진행 로직 \+ itemID: null 처리 
 ~~~js
-function winCombat() {  
-    // 1\. 보상 획득 로직  
-    const reward \= currentEvent.reward;  
-    // ... (골드 획득) ...  
-    if (reward.itemIds && reward.itemIds.length \> 0\) {  
-        const droppedItemInfo \= getWeightedRandom(reward.itemIds);   
-          
-        // itemID가 null이 아닌지 확인  
-        if (droppedItemInfo && droppedItemInfo.itemID) {  
-            const itemData \= findDataById(ALL\_ITEMS, droppedItemInfo.itemID);  
-            if (itemData) {  
-                player.inventory.push(itemData.id);   
-                resultMessage \+= \`\<br\>(${itemData.name} 획득\!)\`;  
-            }  
-        } else {  
-            resultMessage \+= \`\<br\>(아이템 없음)\`;  
-        }  
-    }  
-      
-    gameState \= 'EXPLORING';  
-    currentEvent \= null;   
-      
-    // 2\. 스테이지 진행 로직  
-    stageLevel++;  
-    const areaInfo \= STAGE\_PROGRESSION\_MAP\[currentAreaID\];  
-      
-    if (stageLevel \> areaInfo.levels) {  
-        // 다음 지역 이동  
-        const nextAreaID \= areaInfo.nextArea;  
-        if (nextAreaID \=== 'GAME\_CLEAR') {  
-            winGame();  
-            return;  
-        }  
-        currentAreaID \= nextAreaID;  
-        currentStageData \= findDataById(ALL\_STAGES, currentAreaID);  
-        stageLevel \= 1;  
-        resultMessage \+= \`\<br\>\<br\>\<b\>다음 지역 \[${currentStageData.name}\] (으)로 이동합니다\!\</b\>\`;  
-    } else {  
-        // 현재 지역 계속  
-        resultMessage \+= \`\<br\>\<br\>다음 스테이지 (${stageLevel}/${areaInfo.levels}) 로 이동합니다.\`;  
+function winCombat() {
+    // 보상 획득 로직
+    const reward = currentEvent.reward;
+
+    let gainedGold = 0;
+    let resultMessage = `${currentEvent.name} 처치!`;
+    if (reward.goldRange) {
+        gainedGold = getRandomInt(reward.goldRange.min, reward.goldRange.max);
+        player.gold += gainedGold;
+        resultMessage += `<br>(+${gainedGold} Gold)`;
     }
 
-    updatePlayerStatsUI();  
-    updateMainUI(currentStageData.name, resultMessage, "탐험하기");  
-    setUIForAction(true, true);   
+    if (reward.itemIds && reward.itemIds.length > 0) {
+        const droppedItemInfo = getWeightedRandom(reward.itemIds); 
+        if (droppedItemInfo && droppedItemInfo.itemID) {
+            const itemData = findDataById(ALL_ITEMS, droppedItemInfo.itemID);
+            if (itemData) {
+                player.inventory.push(itemData.id); 
+                resultMessage += `<br>(${itemData.name} 획득!)`;
+            }
+        } else {
+            resultMessage += `<br>(아이템 없음)`;
+        }
+    }
+
+    resetCombatDiceBonus();
+    
+    currentEvent = null; 
+    
+    // 다음 지역으로 진행해야 하는지 확인합니다.
+    const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+    const nextStageLevel = stageLevel + 1; // 다음 스테이지 레벨 계산
+    
+    if (nextStageLevel > areaInfo.levels) {
+        // 현재 지역의 모든 레벨(몬스터)을 클리어했습니다.
+        // 다음 지역으로 진행합니다.
+        
+        resultMessage += `<br><br><b>🎉 지역 클리어! 🎉</b><br>다음 지역으로 이동합니다...`;
+        gameState = 'AREA_CLEAR';
+        
+        // 현재 스테이지 레벨을 유지한 채로 UI 업데이트 (아직 증가시키지 않음)
+        updatePlayerStatsUI();
+        updateMainUI(currentStageData.name, resultMessage, "다음 지역으로");
+        setUIForAction(true, false);
+        
+        // 버튼 클릭 이벤트를 일시적으로 변경
+        const originalHandler = buttonEl.onclick;
+        buttonEl.onclick = () => {
+            buttonEl.onclick = originalHandler; // 원래 핸들러로 복구
+            stageLevel++; // 이제 스테이지 레벨 증가
+            advanceStage();
+        };
+        
+        return;
+    } else {
+        // 현재 지역 내 다음 레벨로 진행합니다.
+        stageLevel++; // 여기서 스테이지 레벨 증가
+        resultMessage += `<br><br>다음 스테이지 (${stageLevel}/${areaInfo.levels}) 로 이동합니다.`;
+        gameState = 'EXPLORING';
+    }
+    
+    updatePlayerStatsUI();
+    updateMainUI(currentStageData.name, resultMessage, "탐험하기");
+    setUIForAction(true, true); 
 }
 ~~~
 ### **다. 인벤토리 및 아이템 사용**
