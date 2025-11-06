@@ -308,7 +308,7 @@
                 ]
             }
         },
-
+      
         {
             id: "wolf",
             name: "늑대",
@@ -856,47 +856,6 @@ function rollDiceDEF() {
     player.attack += tempCombatBonus.attack;
     player.defense += tempCombatBonus.defense;
 
-    // 3. 전투 시작 화면으로 전환
-    gameState = 'COMBAT'; 
-    
-    updatePlayerStatsUI(); // 최종 스탯 반영
-    updateMainUI(`전투 시작!`, 
-                 `${diceMessage}<br><br><b>${currentEvent.name}</b> (HP: ${currentEvent.currentHp})과의 전투를 시작합니다!`, 
-                 "공격하기");
-    setUIForAction(true, false);
-}
-
-function rollDiceAndStartCombat() {
-    // 1. 주사위 보너스 적용 및 메시지 획득
-    const diceMessage = applyCombatDiceBonus();
-
-    // 2. 게임 상태를 전투로 변경
-    gameState = 'COMBAT';
-    
-    // 3. UI 업데이트
-    updatePlayerStatsUI(); // 보너스 스탯이 반영된 스탯창 업데이트
-    updateMainUI(`전투 시작!`, 
-                 `${diceMessage}<br><br>${currentEvent.name} (HP: ${currentEvent.currentHp})`, 
-                 "공격하기");
-    setUIForAction(true, false); // 공격하기 버튼으로 전환
-}
-
-function attackMonster() {
-    let logMessage = "";
-
-    // 1. 플레이어 공격
-    const playerRawDamage = getRandomInt(player.attack - 2, player.attack + 2);
-    const monsterDefense = currentEvent.defense;
-    const playerDamage = Math.max(1, playerRawDamage - monsterDefense); // 최소 1 데미지
-
-    currentEvent.currentHp -= playerDamage;
-    logMessage += `[플레이어] ${currentEvent.name}에게 ${playerDamage}의 피해! (방어: ${monsterDefense})`;
-
-    if (currentEvent.currentHp <= 0) {
-        winCombat(); 
-        return;
-    }
-
     // 2. 몬스터 공격
     const monsterRawDamage = getRandomInt(currentEvent.attack - 1, currentEvent.attack + 1);
     const playerDefense = player.defense;
@@ -1150,6 +1109,7 @@ function displayInventory() {
             itemButton.onclick = () => useItem(item); 
             resultEl.appendChild(itemButton);
         }
+
     }
     const exitButton = document.createElement('button');
     exitButton.textContent = '탐험으로 돌아가기';
