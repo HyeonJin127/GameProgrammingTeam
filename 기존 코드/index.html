@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>주사위 굴리기 시뮬레이터</title>
+    <style>
+        /* CSS 스타일 시작 */
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        #roller-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        #dice-result {
+            font-size: 80px;
+            font-weight: bold;
+            color: #d9534f;
+            margin: 20px 0;
+            min-height: 90px;
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 1.2em;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #449d44;
+        }
+        /* CSS 스타일 끝 */
+    </style>
+</head>
+<body>
+    <div id="roller-container">
+        <h1>랜덤한 난수를 생성합니다</h1>
+        
+        <div id="dice-result">?</div>
+        
+        <button onclick="rollDice()">난수 생성</button>
+
+        <p id="roll-count">총 생성 횟수: 0</p>
+    </div>
+
+    <script>
+        let count = 0; // 생성 횟수를 저장할 변수
+
+        function rollDice() {
+            // 1. 무작위 숫자 생성: 1에서 100 사이의 정수 생성
+            // Math.random()은 0 (포함)에서 1 (제외) 사이의 부동 소수점 숫자를 반환합니다.
+            // Math.floor(Math.random() * 100)는 0부터 99까지의 정수를 만들고,
+            // + 1을 더해 1부터 100까지의 정수로 만듭니다.
+            const randomNumber = Math.floor(Math.random() * 100) + 1;
+
+            // 2. DOM 업데이트: 결과 값을 화면에 표시
+            const resultElement = document.getElementById('dice-result');
+            resultElement.textContent = randomNumber;
+
+            // 3. 횟수 카운트 및 업데이트
+            count++;
+            document.getElementById('roll-count').textContent = `총 굴린 횟수: ${count}`;
+
+            // (선택 사항) 결과에 따른 시각적 피드백
+            resultElement.style.transform = 'rotate(0deg)';
+            resultElement.style.transition = 'none';
+            
+            // 짧은 시간 후 애니메이션 적용
+            setTimeout(() => {
+                resultElement.style.transition = 'transform 0.2s ease-out';
+                // 무작위로 약간 회전시켜 생동감을 더합니다.
+                const randomRotation = Math.floor(Math.random() * 20) - 10; 
+                resultElement.style.transform = `rotate(${randomRotation}deg) scale(1.1)`;
+            }, 10);
+        }
+    </script>
+    </body>
+</html>
