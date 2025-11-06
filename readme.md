@@ -841,6 +841,18 @@ function displayInventory() {
     resultEl.appendChild(exitButton);  
 }
 ~~~
+
+~~~js
+function exitInventory() {
+    if (player.hp <= 0) {
+        loseGame(); 
+    } else {
+        gameState = 'EXPLORING';
+        updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
+        setUIForAction(true, true); 
+    }
+}
+~~~
 #### **useItem()**
 
 인벤토리에서 아이템 버튼 클릭 시 호출됩니다.
