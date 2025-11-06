@@ -39,18 +39,26 @@ let stageLevel;
 let currentStageData;
 let currentEvent; 
 let gameState; 
-let titleEl, statsEl, resultEl, buttonEl, inventoryButtonEl;
+let titleEl, statsEl, resultEl, buttonEl, inventoryButtonEl, gameContainerEl;
 
-// (v5) 상점 로직을 위해 STAGE_PROGRESSION_MAP 수정
+let tempCombatBonus = { attack: 0, defense: 0 };
+
+let isATKDiceRolled = false;
+let isDEFDiceRolled = false;
+let diceRollResultLog = ""; // 주사위 굴림 결과를 누적하여 보여줄 로그
+
 const STAGE_PROGRESSION_MAP = {
-    'forest_enter': { nextArea: 'forest_center', levels: 4 }, 
-    'forest_center': { nextArea: 'shop', levels: 1 },    // 보스 -> 상점
+    'forest_enter': { nextArea: 'forest_center', levels: 4 }, // 1~4 스테이지
+    'forest_center': { nextArea: 'shop', levels: 1 },    // 5 스테이지 (보스)
+    'shop': {nextArea: 'cave_enter', levels: 1},
     'cave_enter': { nextArea: 'cave_deep', levels: 4 },
-    'cave_deep': { nextArea: 'shop', levels: 1 },     // 보스 -> 상점
-    'shop': { nextArea: '?', levels: 1} // 상점은 특별 처리
+    'cave_deep': { nextArea: 'GAME_CLEAR', levels: 1 }
 };
 
 function initializeDOMElements() {
+    // 추가된 메인 컨테이너
+    gameContainerEl = document.getElementById('gameContainer');
+  
     titleEl = document.getElementById('main-title');
     statsEl = document.getElementById('player-stats');
     resultEl = document.getElementById('dice-result');
@@ -71,11 +79,11 @@ function findDataById(array, id) {
 function getWeightedRandom(array) {
     let totalWeight = 0;
     for (const item of array) {
-        totalWeight += item.weight || item.weigth || 0;
+        totalWeight += item.weight || 0;
     }
     let randomNum = Math.random() * totalWeight;
     for (const item of array) {
-        const weight = item.weight || item.weigth || 0;
+        const weight = item.weight || 0;
         if (randomNum < weight) {
             return item;
         }
@@ -100,19 +108,13 @@ function updatePlayerStatsUI() {
             return `${item.name} x${inventoryCounts[id]}`;
         }).join(', ');
     }
-    
-    let stageText = "??";
-    if(currentAreaID) {
-        const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
-        if (areaInfo) {
-            stageText = `${currentStageData.name} (${stageLevel}/${areaInfo.levels})`;
-        } else {
-            stageText = currentStageData.name; // 'shop' 등
-        }
-    }
 
-    statsEl.innerHTML = `<b>Stage: ${stageText}</b><br>
-                         HP: ${player.hp} / ${player.maxHp} | ATK: ${player.attack} | DEF: ${player.defense} | Gold: ${player.gold}<br>
+    const atkBonusText = tempCombatBonus.attack !== 0 ? `(<span style="color:${tempCombatBonus.attack > 0 ? 'yellowgreen' : 'red'};">${tempCombatBonus.attack > 0 ? '+' : ''}${tempCombatBonus.attack}</span>)` : '';
+    const defBonusText = tempCombatBonus.defense !== 0 ? `(<span style="color:${tempCombatBonus.defense > 0 ? 'yellowgreen' : 'red'};">${tempCombatBonus.defense > 0 ? '+' : ''}${tempCombatBonus.defense}</span>)` : '';
+
+    const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+    statsEl.innerHTML = `<b>Stage: ${currentStageData.name} (${stageLevel}/${areaInfo.levels})</b><br>
+                         HP: ${player.hp} / ${player.maxHp} | ATK: ${player.attack}${atkBonusText} | DEF: ${player.defense}${defBonusText} | Gold: ${player.gold}<br>
                          인벤토리: ${inventoryText}`;
 }
 
@@ -131,15 +133,15 @@ function setUIForAction(showMain = false, showInventory = false) {
 }
 
 // ==========================================
-// 4. 게임 플레이 함수 (v5)
+// 4. 게임 플레이 함수
 // ==========================================
 function startGame() {
     player = {
-        hp: 100, maxHp: 100, attack: 10, defense: 5, gold: 0, inventory: [],
-        nextAreaAfterShop: null // (v5) 상점 후 이동할 위치
+        hp: 100, maxHp: 100, attack: 10, defense: 5, gold: 0, inventory: [] 
     };
     currentAreaID = 'forest_enter';
     currentStageData = findDataById(ALL_STAGES, currentAreaID);
+    setMainActionListeners();
     stageLevel = 1;
     gameState = 'EXPLORING';
     updatePlayerStatsUI();
@@ -156,8 +158,19 @@ function handleMainAction() {
         case 'EXPLORING':
             triggerRandomEvent();
             break;
+        // ⭐ 수정: ATK 주사위 굴림 상태 처리 ⭐
+        case 'DICE_ROLL_ATK':
+            rollDiceATK();
+            break;
+        // ⭐ 추가: DEF 주사위 굴림 상태 처리 ⭐
+        case 'DICE_ROLL_DEF':
+            rollDiceDEF();
+            break;
         case 'COMBAT':
             attackMonster();
+            break;
+        case 'AREA_CLEAR':
+            // ... (기존 로직 유지)
             break;
     }
 }
@@ -169,15 +182,6 @@ function handleInventoryAction() {
 }
 
 function triggerRandomEvent() {
-    // (v5) 'shop' 스테이지는 무조건 'shop' 이벤트만 발생
-    if (currentAreaID === 'shop') {
-        const shopEventData = findDataById(ALL_EVENTS, "shop");
-        currentEvent = { ...shopEventData };
-        gameState = 'SHOPPING';
-        displayShopUI();
-        return;
-    }
-
     const eventRoll = getWeightedRandom(currentStageData.randomEvent); 
     const eventData = findDataById(ALL_EVENTS, eventRoll.eventID);
     if (!eventData) {
@@ -186,21 +190,118 @@ function triggerRandomEvent() {
         return;
     }
     if (eventData.baseStats) {
-        gameState = 'COMBAT';
+        gameState = 'DICE_ROLL'; 
+        // 몬스터 정보 초기화 (주사위 굴림 중에는 보너스/패널티를 받지 않으므로 리셋)
+        resetCombatDiceBonus(); 
+        
         currentEvent = {
             ...eventData, 
             currentHp: eventData.baseStats.baseHp,
             attack: eventData.baseStats.baseAttack,
             defense: eventData.baseStats.baseDefense
         };
-        updateMainUI(`몬스터 출현!`, `${currentEvent.name} (HP: ${currentEvent.currentHp})`, "공격하기");
-        setUIForAction(true, false); 
+        
+        displayDiceRollScreen(); // ATK 주사위 굴림 화면 표시
     } 
     else if (eventData.id === "mystery_merchant" || eventData.id === "shop") {
         gameState = 'SHOPPING';
         currentEvent = { ...eventData };
         displayShopUI(); 
     }
+}
+
+function applyCombatDiceBonus(statType) {
+    const diceRoll = getRandomInt(1, 6);
+    let bonus = 0;
+    const statName = statType === 'attack' ? '공격력(ATK)' : '방어력(DEF)';
+    let message = `주사위 굴림 결과: 🎲 <b>${diceRoll}</b>!`;
+
+    if (diceRoll === 6) {
+        bonus = 3;
+        message += `<br>🔥 <b>대성공!</b> ${statName} +3 보너스!`;
+    } else if (diceRoll >= 4) {
+        bonus = 2;
+        message += `<br>👍 <b>성공!</b> ${statName} +2 보너스!`;
+    } else if (diceRoll === 1) {
+        bonus = -1;
+        message += `<br>💀 <b>실패...</b> ${statName} -1 패널티...`;
+    } else {
+        message += `<br>평범한 굴림입니다.`;
+    }
+
+    tempCombatBonus[statType] = bonus;
+    return message;
+}
+
+function resetCombatDiceBonus() {
+    // ... (기존 로직 유지)
+}
+
+function resetCombatDiceBonus() {
+    // 플레이어 스탯에서 임시 보너스 제거
+    player.attack -= tempCombatBonus.attack;
+    player.defense -= tempCombatBonus.defense;
+
+    // 임시 보너스 초기화
+    tempCombatBonus.attack = 0;
+    tempCombatBonus.defense = 0;
+}
+
+function displayDiceRollScreen(statType) {
+    // 몬스터 정보는 이미 currentEvent에 저장되어 있음
+    const statName = statType === 'attack' ? '공격력(ATK)' : '방어력(DEF)';
+    
+    updatePlayerStatsUI();
+    updateMainUI(`몬스터 출현!`, 
+                 `${currentEvent.name}이(가) 나타났다! 전투에 돌입하기 전, **${statName}** 보너스를 위해 주사위를 굴립니다.`, 
+                 `${statName} 주사위 굴리기`);
+    setUIForAction(true, false); 
+}
+
+function rollDiceATK() {
+    // 1. ATK 주사위 굴림 로직 실행 및 결과 메시지 획득
+    const diceMessage = applyCombatDiceBonus('attack');
+
+    // 2. 주사위 결과 화면 표시
+    updateMainUI(`공격력 주사위 결과!`, 
+                 `${diceMessage}<br><br><b>방어력 주사위를 굴릴 준비를 하세요.</b>`, 
+                 "방어력 주사위 굴리기");
+    
+    // 3. 다음 상태로 전환
+    gameState = 'DICE_ROLL_DEF'; 
+}
+
+function rollDiceDEF() {
+    // 1. DEF 주사위 굴림 로직 실행 및 결과 메시지 획득
+    const diceMessage = applyCombatDiceBonus('defense');
+
+    // 2. 최종 스탯 적용
+    player.attack += tempCombatBonus.attack;
+    player.defense += tempCombatBonus.defense;
+
+    // 3. 전투 시작 화면으로 전환
+    gameState = 'COMBAT'; 
+    
+    updatePlayerStatsUI(); // 최종 스탯 반영
+    updateMainUI(`전투 시작!`, 
+                 `${diceMessage}<br><br><b>${currentEvent.name}</b> (HP: ${currentEvent.currentHp})과의 전투를 시작합니다!`, 
+                 "공격하기");
+    setUIForAction(true, false);
+}
+
+function rollDiceAndStartCombat() {
+    // 1. 주사위 보너스 적용 및 메시지 획득
+    const diceMessage = applyCombatDiceBonus();
+
+    // 2. 게임 상태를 전투로 변경
+    gameState = 'COMBAT';
+    
+    // 3. UI 업데이트
+    updatePlayerStatsUI(); // 보너스 스탯이 반영된 스탯창 업데이트
+    updateMainUI(`전투 시작!`, 
+                 `${diceMessage}<br><br>${currentEvent.name} (HP: ${currentEvent.currentHp})`, 
+                 "공격하기");
+    setUIForAction(true, false); // 공격하기 버튼으로 전환
 }
 
 function attackMonster() {
@@ -230,7 +331,30 @@ function attackMonster() {
     }
 }
 
-// (v5) 보스 클리어 후 상점 이동 로직
+function advanceStage() {
+    // 1. 현재 지역의 진행 정보를 STAGE_PROGRESSION_MAP에서 찾습니다.
+    const mapEntry = STAGE_PROGRESSION_MAP[currentAreaID];
+
+    if (mapEntry) {
+        // 2. 다음 지역 ID가 'GAME_CLEAR'인 경우 게임 클리어 로직 실행
+        if (mapEntry.nextArea === 'GAME_CLEAR') {
+            winGame();
+            return;
+        }
+        
+        // 3. 다음 지역으로 이동
+        currentAreaID = mapEntry.nextArea;
+        stageLevel = 1; // 새 지역에서는 레벨을 1로 초기화
+        currentStageData = findDataById(ALL_STAGES, currentAreaID); // ⭐ currentStageData 업데이트
+        
+        // 4. UI를 업데이트하고 다음 지역 탐험을 준비합니다.
+        gameState = 'EXPLORING';
+        updatePlayerStatsUI();
+        updateMainUI(currentStageData.name, `${currentStageData.name}에 진입했습니다.`, "탐험하기"); 
+        setUIForAction(true, true);
+    }
+}
+
 function winCombat() {
     const reward = currentEvent.reward;
     let gainedGold = 0;
@@ -252,64 +376,52 @@ function winCombat() {
             resultMessage += `<br>(아이템 없음)`;
         }
     }
-    gameState = 'EXPLORING';
-    currentEvent = null; 
-    stageLevel++;
-    const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+
+    resetCombatDiceBonus();
     
-    if (stageLevel > areaInfo.levels) {
-        // 다음 지역으로 이동
-        const nextAreaID = areaInfo.nextArea;
-
-        // (v5) 보스 스테이지였는지 확인 (MAP 기준)
-        const isBossStage = (currentAreaID === 'forest_center' || currentAreaID === 'cave_deep');
-
-        if (isBossStage) {
-            // 보스 클리어! 상점으로 강제 이동
-            gameState = 'SHOPPING';
-            
-            // (v5) 상점 방문 후 가야할 곳을 플레이어 객체에 임시 저장
-            if (currentAreaID === 'forest_center') {
-                player.nextAreaAfterShop = 'cave_enter'; 
-            } else if (currentAreaID === 'cave_deep') {
-                player.nextAreaAfterShop = 'GAME_CLEAR';
-            }
-            
-            // 상점 이벤트 데이터 수동 로드
-            currentAreaID = 'shop'; // (v5) 현재 위치를 상점으로 변경
-            currentStageData = findDataById(ALL_STAGES, currentAreaID);
-            stageLevel = 1;
-            
-            const shopEventData = findDataById(ALL_EVENTS, "shop");
-            currentEvent = { ...shopEventData };
-            displayShopUI(); // 상점 UI 표시
-            
-            updatePlayerStatsUI(); 
-            titleEl.textContent = "보스 처치! 상점을 발견했다!"; // 제목 변경
-            return; // 함수 종료 (상점 UI가 표시됨)
-        }
-
-        // (보스가 아닐 경우) 다음 지역으로 즉시 이동
-        if (nextAreaID === 'GAME_CLEAR') {
-            winGame();
-            return;
-        }
-        currentAreaID = nextAreaID;
-        currentStageData = findDataById(ALL_STAGES, currentAreaID);
-        stageLevel = 1;
-        resultMessage += `<br><br><b>다음 지역 [${currentStageData.name}] (으)로 이동합니다!</b>`;
+    currentEvent = null; 
+    
+    // 다음 지역으로 진행해야 하는지 확인합니다.
+    const areaInfo = STAGE_PROGRESSION_MAP[currentAreaID];
+    const nextStageLevel = stageLevel + 1; // 다음 스테이지 레벨 계산
+    
+    if (nextStageLevel > areaInfo.levels) {
+        // 현재 지역의 모든 레벨(몬스터)을 클리어했습니다.
+        // 다음 지역으로 진행합니다.
+        
+        resultMessage += `<br><br><b>🎉 지역 클리어! 🎉</b><br>다음 지역으로 이동합니다...`;
+        gameState = 'AREA_CLEAR';
+        
+        // 현재 스테이지 레벨을 유지한 채로 UI 업데이트 (아직 증가시키지 않음)
+        updatePlayerStatsUI();
+        updateMainUI(currentStageData.name, resultMessage, "다음 지역으로");
+        setUIForAction(true, false);
+        
+        // 버튼 클릭 이벤트를 일시적으로 변경
+        const originalHandler = buttonEl.onclick;
+        buttonEl.onclick = () => {
+            buttonEl.onclick = originalHandler; // 원래 핸들러로 복구
+            stageLevel++; // 이제 스테이지 레벨 증가
+            advanceStage();
+        };
+        
+        return;
     } else {
-        // 현재 지역 탐험 계속
+        // 현재 지역 내 다음 레벨로 진행합니다.
+        stageLevel++; // 여기서 스테이지 레벨 증가
         resultMessage += `<br><br>다음 스테이지 (${stageLevel}/${areaInfo.levels}) 로 이동합니다.`;
+        gameState = 'EXPLORING';
     }
+    
     updatePlayerStatsUI();
     updateMainUI(currentStageData.name, resultMessage, "탐험하기");
     setUIForAction(true, true); 
 }
 
 function loseGame() {
+    resetCombatDiceBonus();
+
     gameState = 'GAME_OVER';
-    player.nextAreaAfterShop = null; // (v5) 플래그 초기화
     updatePlayerStatsUI();
     updateMainUI("게임 오버", "사망했습니다...", "다시 시작하기");
     setUIForAction(true, true); 
@@ -317,14 +429,116 @@ function loseGame() {
 
 function winGame() {
     gameState = 'GAME_OVER'; 
-    player.nextAreaAfterShop = null; // (v5) 플래그 초기화
     updatePlayerStatsUI();
     updateMainUI("★ GAME CLEAR ★", "모든 스테이지를 클리어했습니다!", "다시 시작하기");
     setUIForAction(true, false); 
 }
 
+function setMainActionListeners() {
+    // 일반 상태: 메인 버튼 = handleMainAction, 인벤토리 버튼 = handleInventoryAction
+    buttonEl.onclick = handleMainAction;
+    inventoryButtonEl.onclick = handleInventoryAction;
+}
+
+function clearMainActionListeners() {
+    // 리스너 제거
+    buttonEl.onclick = null;
+    inventoryButtonEl.onclick = null;
+}
+
+function setDiceRollListeners() {
+    // 주사위 굴림 상태: 메인 버튼 = ATK 굴림, 인벤토리 버튼 = DEF 굴림
+    clearMainActionListeners();
+    buttonEl.onclick = handleATKDiceRoll;
+    inventoryButtonEl.onclick = handleDEFDiceRoll;
+}
+
+// [4. 게임 플레이 함수] 섹션에 새로 추가
+
+function displayDiceRollScreen() {
+    // 상태 초기화
+    isATKDiceRolled = false;
+    isDEFDiceRolled = false;
+    diceRollResultLog = "";
+    
+    // 버튼 리스너 설정
+    setDiceRollListeners();
+
+    // UI 업데이트
+    updatePlayerStatsUI();
+    updateMainUI(`몬스터 출현!`, 
+                 `${currentEvent.name}이(가) 나타났다! 전투에 돌입하기 전, 공격력과 방어력 주사위를 굴립니다.`, 
+                 "공격력 주사위 굴리기");
+    
+    // 인벤토리 버튼을 DEF 주사위 버튼으로 사용
+    inventoryButtonEl.textContent = '방어력 주사위 굴리기';
+    inventoryButtonEl.disabled = false; // 버튼 활성화
+    buttonEl.disabled = false;
+    setUIForAction(true, true); // 두 버튼 모두 표시
+}
+
+function startCombatAfterDiceRoll() {
+    // 1. 최종 스탯 적용
+    player.attack += tempCombatBonus.attack;
+    player.defense += tempCombatBonus.defense;
+
+    // 2. 전투 상태로 전환 및 리스너 복구
+    gameState = 'COMBAT'; 
+    setMainActionListeners(); 
+
+    buttonEl.disabled = false;
+    inventoryButtonEl.disabled = false;
+    inventoryButtonEl.textContent = '인벤토리';
+
+    // 3. UI 업데이트
+    updatePlayerStatsUI(); 
+    updateMainUI(`전투 시작!`, 
+                 `${diceRollResultLog}<br><b>${currentEvent.name}</b> (HP: ${currentEvent.currentHp})과의 전투를 시작합니다!`, 
+                 "공격하기");
+    setUIForAction(true, false); // 인벤토리 버튼 숨김 (원래의 전투 UI)
+}
+
+function handleATKDiceRoll() {
+    if (isATKDiceRolled) return;
+
+    const message = applyCombatDiceBonus('attack');
+
+    isATKDiceRolled = true;
+    diceRollResultLog += `[ATK 굴림]: ${message}<br>`;
+
+    buttonEl.disabled = true;
+    buttonEl.textContent = `공격력 굴림 완료 (+${tempCombatBonus.attack})`;
+
+    resultEl.innerHTML = diceRollResultLog;
+    updatePlayerStatsUI();
+    
+    // 두 주사위 모두 굴렸으면 전투 시작
+    if (isDEFDiceRolled) {
+        startCombatAfterDiceRoll();
+    }
+}
+
+function handleDEFDiceRoll() {
+    if (isDEFDiceRolled) return;
+
+    const message = applyCombatDiceBonus('defense');
+
+    isDEFDiceRolled = true;
+    diceRollResultLog += `[DEF 굴림]: ${message}<br>`;
+
+    inventoryButtonEl.disabled = true;
+    inventoryButtonEl.textContent = `방어력 굴림 완료 (+${tempCombatBonus.defense})`;
+
+    resultEl.innerHTML = diceRollResultLog;
+    updatePlayerStatsUI();
+
+    if (isATKDiceRolled) {
+        startCombatAfterDiceRoll();
+    }
+}
+
 // ==========================================
-// 5. 인벤토리 및 아이템 사용 (v4)
+// 5. 인벤토리 및 아이템 사용
 // ==========================================
 function displayInventory() {
     gameState = 'INVENTORY';
@@ -332,10 +546,6 @@ function displayInventory() {
     resultEl.innerHTML = ''; 
     resultEl.style.textAlign = 'left'; 
     setUIForAction(false, false); 
-    
-    // (v5) 상점에서도 인벤토리를 열 수 있도록 함
-    if (inventoryButtonEl) inventoryButtonEl.style.display = 'block';
-
     const inventoryCounts = {};
     for (const itemId of player.inventory) {
         inventoryCounts[itemId] = (inventoryCounts[itemId] || 0) + 1;
@@ -353,7 +563,7 @@ function displayInventory() {
         }
     }
     const exitButton = document.createElement('button');
-    exitButton.textContent = '돌아가기'; // (v5) '상점'일 수도 있으므로
+    exitButton.textContent = '탐험으로 돌아가기';
     exitButton.className = 'exit-button';
     exitButton.onclick = () => exitInventory(); 
     resultEl.appendChild(exitButton);
@@ -363,17 +573,9 @@ function exitInventory() {
     if (player.hp <= 0) {
         loseGame(); 
     } else {
-        // (v5) 상점에서 인벤토리를 열었는지 확인
-        if (currentAreaID === 'shop') {
-            gameState = 'SHOPPING';
-            displayShopUI();
-        } 
-        // (v5) 일반 탐험 중이었는지 확인
-        else {
-            gameState = 'EXPLORING';
-            updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
-            setUIForAction(true, true); 
-        }
+        gameState = 'EXPLORING';
+        updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
+        setUIForAction(true, true); 
     }
 }
 
@@ -414,17 +616,13 @@ function useItem(itemToUse) {
 }
 
 // ==========================================
-// 6. 상점 기능 (v5)
+// 6. 상점 기능
 // ==========================================
 function displayShopUI() {
     titleEl.textContent = currentEvent.name; 
     resultEl.innerHTML = ''; 
     resultEl.style.textAlign = 'left'; 
     setUIForAction(false, false); 
-    
-    // (v5) 상점 내에서 인벤토리 버튼 활성화
-    if(inventoryButtonEl) inventoryButtonEl.style.display = 'block';
-
     generateShopInventory(currentEvent); 
     for (const item of currentEvent.inventory) {
         const itemButton = document.createElement('button');
@@ -439,32 +637,15 @@ function displayShopUI() {
     resultEl.appendChild(exitButton);
 }
 
-// (v5) 상점 나가기 로직 수정
 function exitShop() {
     gameState = 'EXPLORING';
     currentEvent = null;
-
-    // (v5) 보스 클리어 직후 상점이었는지 확인
-    if (player.nextAreaAfterShop) {
-        const nextAreaID = player.nextAreaAfterShop;
-        player.nextAreaAfterShop = null; // 플래그 초기화
-
-        if (nextAreaID === 'GAME_CLEAR') {
-            winGame();
-            return;
-        }
-        
-        // 다음 지역으로 이동
-        currentAreaID = nextAreaID;
-        currentStageData = findDataById(ALL_STAGES, currentAreaID);
-        stageLevel = 1;
-        
-        updatePlayerStatsUI();
-        updateMainUI(currentStageData.name, `상점을 나와 [${currentStageData.name}](으)로 이동합니다.`, "탐험하기");
-        setUIForAction(true, true);
-
+    
+    // ⭐ 상점 스테이지(id가 'shop'인 경우)에서 나갈 때만 다음 지역으로 이동 ⭐
+    if (currentAreaID === 'shop') { 
+        advanceStage(); // 다음 지역으로 이동
     } else {
-        // (v5) 일반 탐험 중 만난 상점
+        // 상인이벤트(mystery_merchant) 등 다른 이벤트에서 나가는 경우
         updateMainUI(currentStageData.name, '탐험을 계속합니다.', '탐험하기');
         setUIForAction(true, true); 
     }
@@ -487,7 +668,6 @@ function generateShopInventory(eventData) {
     if (eventData.id === 'shop') {
         itemIDList = eventData.itemIds;
     } else if (eventData.id === 'mystery_merchant') {
-        // (개선 필요) 현재는 상인도 모든 아이템 판매
         itemIDList = eventData.itemIds.map(item => item.itemID); 
     }
     for (const id of itemIDList) {
