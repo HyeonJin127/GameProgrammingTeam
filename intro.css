@@ -2,6 +2,11 @@
  File: intro.css
  Note: event.html 과 같은 폴더에 저장
 ========================= */
+@font-face {
+  font-family: 'MyGameFont';
+  src: url('DungGeunMo.ttf') format('truetype');
+}
+
 :root {
   --bg: #000000;
   --accent: #ffb86b;
